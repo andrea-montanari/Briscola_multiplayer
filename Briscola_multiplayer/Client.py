@@ -49,7 +49,6 @@ class Card:
 
         # Variables for checking when the dealing is done
         self.moving = False
-        self.done_dealing = False
 
         # Variables used to handle the mouse click
         self.pressed = False
@@ -58,9 +57,8 @@ class Card:
         # Variable use for moving the card
         self.target_position = position
 
-    def set_target_position(self, target_position, deal=False):
+    def set_target_position(self, target_position):
         self.target_position = target_position
-        self.deal = deal        # True if the cards are moving because of a deal
 
     def move_card(self):
         card_moved = False
@@ -84,15 +82,11 @@ class Card:
         self.rect.center = self.position
 
         if not card_moved and self.moving:
-
-            # Posting an event that notifies the the dealer is done dealing
+            # Posting an event that notifies that the the dealer is done dealing (the event is published multiple
+            # times but it had effect only the first time)
             pygame.event.post(Card.done_dealing_event)
 
             self.moving = False
-            self.done_dealing = True
-        if not card_moved:
-            self.moving = False
-        return self.done_dealing
 
     def is_moving(self):
         # target_x_r = self.target_position[0] + self.vel
@@ -110,8 +104,7 @@ class Card:
             screen.blit(self.face, self.rect)
         else:
             screen.blit(self.back, self.rect)
-        done_dealing = self.move_card()
-        return done_dealing
+        self.move_card()
 
     def turn(self):
         self.turned = not self.turned
@@ -206,9 +199,9 @@ class Dealer:
         rand_card_3 = deck.pop(random.choice(list(deck.keys())))
 
         # Deal the cards
-        rand_card_1.set_target_position(player.hand_positions[0], deal=True)
-        rand_card_2.set_target_position(player.hand_positions[1], deal=True)
-        rand_card_3.set_target_position(player.hand_positions[2], deal=True)
+        rand_card_1.set_target_position(player.hand_positions[0])
+        rand_card_2.set_target_position(player.hand_positions[1])
+        rand_card_3.set_target_position(player.hand_positions[2])
 
         # Assign cards to player
         player.cards_in_hand = [rand_card_1, rand_card_2, rand_card_3]
