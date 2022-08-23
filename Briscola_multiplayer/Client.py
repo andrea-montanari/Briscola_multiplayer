@@ -36,7 +36,7 @@ class Card:
     cards_moving_event = pygame.event.Event(CARDS_MOVING)
     cards_stopped_event = pygame.event.Event(CARDS_STOPPED)
 
-    def __init__(self, card_code, position):
+    def __init__(self, card_code, position, vel=10):
         self.position = position
         self.number = int(card_code[:-1])
         self.seed = card_code[-1]
@@ -46,7 +46,7 @@ class Card:
         self.rect = self.face.get_rect()
         self.rect.center = position
         self.turned = False
-        self.vel = 20
+        self.vel = vel
 
         # Values and points assignment: used to determine the hand winner and the game winner
         self.value = Card.card_values[self.number - 1]
@@ -68,13 +68,6 @@ class Card:
     def set_target_position(self, target_position, dealing=False):
         self.target_position = target_position
         self.dealing = dealing
-
-    def move_card_by_offset(self, offset_x, offset_y):
-        new_position = []
-        new_position.append(self.target_position[0] + offset_x)
-        new_position.append(self.target_position[1] + offset_y)
-        pygame.draw.rect(screen, (0, 0, 0), self.rect.inflate(4, 4), width=5, border_radius=8)
-        self.target_position = new_position
 
     def move_card(self):
         card_moved = False
@@ -210,11 +203,8 @@ class Button:
 
 
 class Dealer:
-    def __init__(self, player_turn):
-        self.player_turn = player_turn
-        self.current_play_num = 0
-        self.num_of_players = 2
-        self.played_cards = {}
+    def __init__(self):
+        pass
 
     def deal(self, deck, player):
         # Pop 3 random cards from the deck
@@ -233,71 +223,6 @@ class Dealer:
     def set_briscola(self, deck):
         rand_card = deck.pop(random.choice(list(deck.keys())))
         return rand_card
-
-    def register_play(self):
-        # TODO: evaluate moving this method to the game manager class
-
-        # Registers play results
-        self.played_cards[self.player_turn] = card
-
-        # Updates turn and play's number
-        self.current_play_num = self.current_play_num % self.num_of_players + 1
-        if self.current_play_num == 1 and self.player_turn == 1:
-            self.player_turn = 2
-        elif self.current_play_num == 1 and self.player_turn == 2:
-            self.player_turn = 1
-        elif self.current_play_num == 2:
-            self.player_turn = 0
-        print("Play results: ", self.played_cards)
-        print("Plays num: ", self.current_play_num)
-
-    def get_hand_winner(self, players, briscola):
-        # TODO: evaluate moving this method to the game manager class
-
-        # Establish winner
-        briscola_seed = briscola.seed
-        p1_seed = self.played_cards[1].seed
-        p1_value = self.played_cards[1].value
-        p2_seed = self.played_cards[2].seed
-        p2_value = self.played_cards[2].value
-        first_to_play = list(self.played_cards.keys())[0]
-        print("p1 number: ", p1_value)
-        print("p2 number: ", p2_value)
-        if briscola_seed == p1_seed and briscola_seed == p2_seed:  # Both played briscola
-            if p1_value > p2_value:
-                winner = 1
-            else:
-                winner = 2
-        elif briscola_seed == p1_seed:
-            winner = 1
-        elif briscola_seed == p2_seed:
-            winner = 2
-        elif p1_seed != p2_seed:
-            winner = first_to_play
-        elif p1_value > p2_value:
-            winner = 1
-        else:
-            winner = 2
-
-        self.player_turn = winner
-        self.current_play_num = 0
-
-        # Add won cards to the list of won cards of the player
-        played_cards_list = list(self.played_cards.values())
-        players[winner - 1].won_cards += played_cards_list
-
-        # Move the cards from the table to the "won cards deck" of the winner
-        played_cards_list[0].set_target_position(players[winner - 1].won_cards_position)
-        played_cards_list[1].set_target_position(players[winner - 1].won_cards_position)
-
-        # Turn the cards
-        played_cards_list[0].turn()
-        played_cards_list[1].turn()
-
-        # Clean the previous play's results
-        self.played_cards = {}
-
-        return winner
 
 
 class Player:
@@ -380,11 +305,92 @@ class DummyDeck:
 
 
 class GameManager:
-    def __init__(self, players):
+    def __init__(self, players, first_hand_player):
         self.players = players
+
+        self.player_turn = first_hand_player
+        self.current_play_num = 0
+        self.num_of_players = 2
+        self.played_cards = {}
+
         self.game_winner = None
 
-    def get_game_winner(self):
+    def print_turn(self, font=pygame.font.Font(None, 30), text_color=(255, 255, 255)):
+        if self.player_turn == 1:
+            text = "È il tuo turno"
+        else:
+            text = "L'avversario sta giocando"
+        text_surf = font.render(text, True, text_color)
+        text_rect = text_surf.get_rect()
+        text_rect.center = [screen_w // 2 + 310, screen_h - 200]
+        screen.blit(text_surf, text_rect)
+
+    def register_play(self):
+        # TODO: evaluate moving this method to the game manager class
+
+        # Registers play results
+        self.played_cards[self.player_turn] = card
+
+        # Updates turn and play's number
+        self.current_play_num = self.current_play_num % self.num_of_players + 1
+        if self.current_play_num == 1 and self.player_turn == 1:
+            self.player_turn = 2
+        elif self.current_play_num == 1 and self.player_turn == 2:
+            self.player_turn = 1
+        elif self.current_play_num == 2:
+            self.player_turn = 0
+        print("Play results: ", self.played_cards)
+        print("Plays num: ", self.current_play_num)
+
+    def calculate_hand_winner(self, players, briscola):
+        # TODO: evaluate moving this method to the game manager class
+
+        # Establish winner
+        briscola_seed = briscola.seed
+        p1_seed = self.played_cards[1].seed
+        p1_value = self.played_cards[1].value
+        p2_seed = self.played_cards[2].seed
+        p2_value = self.played_cards[2].value
+        first_to_play = list(self.played_cards.keys())[0]
+        print("p1 number: ", p1_value)
+        print("p2 number: ", p2_value)
+        if briscola_seed == p1_seed and briscola_seed == p2_seed:  # Both played a briscola card
+            if p1_value > p2_value:
+                winner = 1
+            else:
+                winner = 2
+        elif briscola_seed == p1_seed:
+            winner = 1
+        elif briscola_seed == p2_seed:
+            winner = 2
+        elif p1_seed != p2_seed:
+            winner = first_to_play
+        elif p1_value > p2_value:
+            winner = 1
+        else:
+            winner = 2
+
+        self.player_turn = winner
+        self.current_play_num = 0
+
+        # Add won cards to the list of won cards of the player
+        played_cards_list = list(self.played_cards.values())
+        players[winner - 1].won_cards += played_cards_list
+
+        # Move the cards from the table to the "won cards deck" of the winner
+        played_cards_list[0].set_target_position(players[winner - 1].won_cards_position)
+        played_cards_list[1].set_target_position(players[winner - 1].won_cards_position)
+
+        # Turn the cards
+        played_cards_list[0].turn()
+        played_cards_list[1].turn()
+
+        # Clean the previous play's results
+        self.played_cards = {}
+
+        return winner
+
+    def calculate_game_winner(self):
         player_points = []
         for i, player in enumerate(self.players):
             player_points.append(0)
@@ -425,13 +431,13 @@ class GameManager:
             return True
         return False
 
-    def print_game_winner(self, screen_center, font=pygame.font.Font(None, 60), text_color=(255, 255, 255)):
+    def print_game_winner(self, screen_center, font=pygame.font.Font(None, 50), text_color=(255, 255, 255)):
         text = ""
         # print("Game winner (print_game_winner): ", game_winner)
         if self.game_winner == 1:
             text += "Hai vinto con " + str(self.players[0].game_points) + " punti!"
         elif self.game_winner == -1:
-            text += "Tie"
+            text += "Pareggio"
         else:
             text += "Hai perso con " + str(self.players[0].game_points) + " punti."
 
@@ -460,7 +466,7 @@ for i in range(0, 40):
 dummy_decks = [DummyDeck([screen_w - 200, screen_h // 2])]
 
 # Dealer, players and manager creation and setup
-dealer = Dealer(1)  # Player 1 begins
+dealer = Dealer()  # Player 1 begins
 player1 = Player(hand_positions=[[screen_w // 2 + 110, screen_h - 200], [screen_w // 2 - 10, screen_h - 200],
                                  [screen_w // 2 - 130, screen_h - 200]], won_cards_position=[500, screen_h - 200])
 player2 = Player(hand_positions=[[screen_w // 2 + 110, 200], [screen_w // 2 - 10, 200],
@@ -470,7 +476,7 @@ briscola = dealer.set_briscola(deck)
 briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
 dealer.deal(deck, player1)
 dealer.deal(deck, player2)
-game_manager = GameManager(players)
+game_manager = GameManager(players, first_hand_player=1)    # TODO: modify this to be the player that created the game on the server
 
 # Loop management variables
 running = True
@@ -528,7 +534,7 @@ while running:
     # The cards in the players' hands and the won cards are shown, meanwhile we get a boolean variable for when the dealer is done dealing
     # and the cards are not moving anymore.
     if game_status != GAME_OVER:
-        for card in player1.cards_in_hand + player2.cards_in_hand + player1.won_cards + player2.won_cards + list(dealer.played_cards.values()):
+        for card in player1.cards_in_hand + player2.cards_in_hand + player1.won_cards + player2.won_cards + list(game_manager.played_cards.values()):
             card.draw(screen)
     if game_status == GAME_OVER:
         # print("STAMPO CARTE VINTE")
@@ -543,24 +549,25 @@ while running:
     # TODO: creare una o più funzioni per la giocata.
     # print("dealer.player_turn: ", dealer.player_turn)
     # print("Done dealing: ", done_dealing)
-    if game_status == PLAYING and dealer.player_turn > 0 and not player1.waiting_for_card() and not player2.waiting_for_card():
+    if game_status == PLAYING and game_manager.player_turn > 0 and not player1.waiting_for_card() and not player2.waiting_for_card():
+        game_manager.print_turn()
         played_card = None
-        for i, card in enumerate(players[dealer.player_turn - 1].cards_in_hand):
+        for i, card in enumerate(players[game_manager.player_turn - 1].cards_in_hand):
             card_clicked = card.check_click(screen)
             if card_clicked:
                 played_card = card
-                current_player = players[dealer.player_turn - 1]
+                current_player = players[game_manager.player_turn - 1]
                 # print("Card clicked", played_card.number, played_card.seed)
                 # print("players[dealer.player_turn-1].cards_in_hand", players[dealer.player_turn-1].cards_in_hand)
-                current_player.play(card, card_index=i, plays_num=dealer.current_play_num)
-                dealer.register_play()
+                current_player.play(card, card_index=i, plays_num=game_manager.current_play_num)
+                game_manager.register_play()
                 card.draw(screen)
                 if deck_finished:
                     current_player.pop_card_in_hand(index=i)
 
-    if dealer.current_play_num == 2:
+    if game_manager.current_play_num == 2:
         if not played_card.is_moving():
-            winner = dealer.get_hand_winner(players, briscola)
+            winner = game_manager.calculate_hand_winner(players, briscola)
             if not deck_finished:
                 players[winner - 1].draw_card(deck, briscola)  # The winner draws first
                 print("Winner: ", winner, "winner % 2 + 1: ", winner % 2 + 1)
@@ -575,7 +582,7 @@ while running:
             and game_manager.check_ready_to_assign_the_win() and not game_status == GAME_OVER:
         game_status = GAME_OVER
         game_manager.show_won_cards()
-        game_winner = game_manager.get_game_winner()
+        game_winner = game_manager.calculate_game_winner()
 
     clock.tick(60)
     pygame.display.update()
