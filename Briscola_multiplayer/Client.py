@@ -1,8 +1,10 @@
 import random
-
-import pygame
 import sys
-import ctypes
+
+import Pyro5.client
+import pygame
+
+sys.excepthook = Pyro5.errors.excepthook
 
 pygame.init()
 
@@ -36,10 +38,10 @@ class Card:
     cards_moving_event = pygame.event.Event(CARDS_MOVING)
     cards_stopped_event = pygame.event.Event(CARDS_STOPPED)
 
-    def __init__(self, card_code, position, vel=10):
+    def __init__(self, card_code, position=[screen_w - 200, screen_h // 2], vel=10):
         self.position = position
         self.number = int(card_code[:-1])
-        self.seed = card_code[-1]
+        self.suit = card_code[-1]
         self.face = pygame.image.load("svg-napoletane/" + card_code + ".png")
         print("Card code nella classe Card: ", card_code)
         self.back = pygame.image.load("svg-napoletane/back.png")
@@ -202,29 +204,6 @@ class Button:
         return self.click
 
 
-class Dealer:
-    def __init__(self):
-        pass
-
-    def deal(self, deck, player):
-        # Pop 3 random cards from the deck
-        rand_card_1 = deck.pop(random.choice(list(deck.keys())))
-        rand_card_2 = deck.pop(random.choice(list(deck.keys())))
-        rand_card_3 = deck.pop(random.choice(list(deck.keys())))
-
-        # Deal the cards
-        rand_card_1.set_target_position(player.hand_positions[0], dealing=True)
-        rand_card_2.set_target_position(player.hand_positions[1], dealing=True)
-        rand_card_3.set_target_position(player.hand_positions[2], dealing=True)
-
-        # Assign cards to player
-        player.cards_in_hand = [rand_card_1, rand_card_2, rand_card_3]
-
-    def set_briscola(self, deck):
-        rand_card = deck.pop(random.choice(list(deck.keys())))
-        return rand_card
-
-
 class Player:
     # Creating an event that notifies the end of the game
     # Note: adjust the event indexes if needed
@@ -295,7 +274,7 @@ class Player:
 
 
 class DummyDeck:
-    def __init__(self, position, path="svg-napoletane/back.png"):
+    def __init__(self, position=[screen_w - 200, screen_h // 2], path="svg-napoletane/back.png"):
         self.image = pygame.image.load(path).convert_alpha()
         self.rect = self.image.get_rect()
         self.rect.center = position
@@ -314,6 +293,19 @@ class GameManager:
         self.played_cards = {}
 
         self.game_winner = None
+
+    def transform_deck(self, deck):
+        """
+        Transforms the server generated deck in a dictionary populated with Card objects
+        :param deck: list of cards'symbols that represent a deck
+        :return: dictionary with card symbols as keys and Card objects as values
+        """
+        transformed_deck = {}
+        for card_symbol in deck:
+            card_suit = card_symbol[-1]
+            card_number = card_symbol[:-1]
+            transformed_deck[card_symbol] = Card(card_number + card_suit)
+        return transformed_deck
 
     def print_turn(self, font=pygame.font.Font(None, 30), text_color=(255, 255, 255)):
         if self.player_turn == 1:
@@ -346,24 +338,24 @@ class GameManager:
         # TODO: evaluate moving this method to the game manager class
 
         # Establish winner
-        briscola_seed = briscola.seed
-        p1_seed = self.played_cards[1].seed
+        briscola_suit = briscola.suit
+        p1_suit = self.played_cards[1].suit
         p1_value = self.played_cards[1].value
-        p2_seed = self.played_cards[2].seed
+        p2_suit = self.played_cards[2].suit
         p2_value = self.played_cards[2].value
         first_to_play = list(self.played_cards.keys())[0]
         print("p1 number: ", p1_value)
         print("p2 number: ", p2_value)
-        if briscola_seed == p1_seed and briscola_seed == p2_seed:  # Both played a briscola card
+        if briscola_suit == p1_suit and briscola_suit == p2_suit:  # Both played a briscola card
             if p1_value > p2_value:
                 winner = 1
             else:
                 winner = 2
-        elif briscola_seed == p1_seed:
+        elif briscola_suit == p1_suit:
             winner = 1
-        elif briscola_seed == p2_seed:
+        elif briscola_suit == p2_suit:
             winner = 2
-        elif p1_seed != p2_seed:
+        elif p1_suit != p2_suit:
             winner = first_to_play
         elif p1_value > p2_value:
             winner = 1
@@ -397,7 +389,7 @@ class GameManager:
             print("Player ", i+1, " cards: ")
             for card in player.won_cards:
                 player_points[i] += card.points
-                print(str(card.number) + card.seed, ", ")
+                print(str(card.number) + card.suit, ", ")
             print("Player ", i+1, " points: ", player_points[i])
             player.assign_game_points(player_points[i])
 
@@ -447,36 +439,35 @@ class GameManager:
         screen.blit(text_surf, text_rect)
 
 
-
-# Buttons creation
-btn_exit = Button('X', (screen_w - 100, 50), 40, 40, border_radius=30, over_color='#D74B4B')
-# btn_draw = Button('DRAW', (80, 50), 100, 40, border_radius=30)
-
-# Cards creation
-deck = {}
-card_suits = ['B', 'C', 'D', 'S']
-suits_index = 0
-for i in range(0, 40):
-    deck_key = str(i % 10 + 1) + card_suits[i // 10]
-    print("deck_key: ", deck_key)
-    print("Suit index: ", suits_index)
-    deck[deck_key] = Card(str(i % 10 + 1) + card_suits[suits_index], [screen_w - 200, screen_h // 2])
-    if (i + 1) % 10 == 0:
-        suits_index += 1
-dummy_decks = [DummyDeck([screen_w - 200, screen_h // 2])]
-
-# Dealer, players and manager creation and setup
-dealer = Dealer()  # Player 1 begins
+# Players and manager creation
 player1 = Player(hand_positions=[[screen_w // 2 + 110, screen_h - 200], [screen_w // 2 - 10, screen_h - 200],
                                  [screen_w // 2 - 130, screen_h - 200]], won_cards_position=[500, screen_h - 200])
 player2 = Player(hand_positions=[[screen_w // 2 + 110, 200], [screen_w // 2 - 10, 200],
                                  [screen_w // 2 - 130, 200]], won_cards_position=[500, 200])
 players = [player1, player2]    # Player1 corresponds to the user that is running the client
-briscola = dealer.set_briscola(deck)
-briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
-dealer.deal(deck, player1)
-dealer.deal(deck, player2)
 game_manager = GameManager(players, first_hand_player=1)    # TODO: modify this to be the player that created the game on the server
+
+# Briscola, deck and dummy deck creation
+server_dealer = Pyro5.client.Proxy("PYRONAME:server.dealer")
+server_dealer.create_deck()
+briscola_symbol = server_dealer.set_briscola()
+briscola = Card(briscola_symbol)
+list_deck = server_dealer.get_deck()
+deck = game_manager.transform_deck(list_deck)
+dummy_decks = [DummyDeck()]
+print("Len deck: ", len(deck))
+print("Deck: ", deck.keys()),
+print("Briscola: ", str(briscola.number) + briscola.suit)
+
+# Buttons creation
+btn_exit = Button('X', (screen_w - 100, 50), 40, 40, border_radius=30, over_color='#D74B4B')
+# btn_draw = Button('DRAW', (80, 50), 100, 40, border_radius=30)
+
+# # Dealer, players and manager creation and setup
+# briscola = dealer.set_briscola(deck)
+# briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
+# dealer.deal(deck, player1)
+# dealer.deal(deck, player2)
 
 # Loop management variables
 running = True
@@ -557,7 +548,7 @@ while running:
             if card_clicked:
                 played_card = card
                 current_player = players[game_manager.player_turn - 1]
-                # print("Card clicked", played_card.number, played_card.seed)
+                # print("Card clicked", played_card.number, played_card.suit)
                 # print("players[dealer.player_turn-1].cards_in_hand", players[dealer.player_turn-1].cards_in_hand)
                 current_player.play(card, card_index=i, plays_num=game_manager.current_play_num)
                 game_manager.register_play()
@@ -572,8 +563,8 @@ while running:
                 players[winner - 1].draw_card(deck, briscola)  # The winner draws first
                 print("Winner: ", winner, "winner % 2 + 1: ", winner % 2 + 1)
                 players[winner % 2].draw_card(deck, briscola)
-            # print("Player 1 cards in hand: ", [str(x.number)+x.seed for x in player1.cards_in_hand])
-            # print("Player 2 cards in hand: ", [str(x.number)+x.seed for x in player2.cards_in_hand])
+            # print("Player 1 cards in hand: ", [str(x.number)+x.suit for x in player1.cards_in_hand])
+            # print("Player 2 cards in hand: ", [str(x.number)+x.suit for x in player2.cards_in_hand])
     # -------------------------------------------------------------------------------- #
 
     # The game is over when neither of the players have any card in their hand
