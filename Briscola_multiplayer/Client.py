@@ -2,6 +2,7 @@ import random
 import sys
 
 import Pyro5.client
+import Pyro5.server
 import pygame
 
 sys.excepthook = Pyro5.errors.excepthook
@@ -38,7 +39,7 @@ class Card:
     cards_moving_event = pygame.event.Event(CARDS_MOVING)
     cards_stopped_event = pygame.event.Event(CARDS_STOPPED)
 
-    def __init__(self, card_code, position=[screen_w - 200, screen_h // 2], vel=10):
+    def __init__(self, card_code, position, vel=10):
         self.position = position
         self.number = int(card_code[:-1])
         self.suit = card_code[-1]
@@ -69,6 +70,7 @@ class Card:
 
     def set_target_position(self, target_position, dealing=False):
         self.target_position = target_position
+        print("Target position: ", self.target_position)
         self.dealing = dealing
 
     def move_card(self):
@@ -89,6 +91,9 @@ class Card:
             self.position[1] -= self.vel
             card_moved = True
             self.moving = True
+
+        # print("card's target position: ", self.target_position[0], ", ", self.target_position[1])
+        # print("Card's position: ", self.position[0], ", ", self.position[1])
 
         self.rect.center = self.position
 
@@ -131,7 +136,7 @@ class Card:
             if pygame.mouse.get_pressed()[0]:  # checks fot the left button click
                 self.pressed = True
             else:
-                if self.pressed == True:  # We consider the button pressed only if the mouse button was pressed and then released
+                if self.pressed:  # We consider the button pressed only if the mouse button was pressed and then released
                     self.click = True
                     self.pressed = False
         else:
@@ -146,8 +151,7 @@ class Card:
 
 class Button:
     def __init__(self, text, pos, width, height, elevation=6, border_radius=10, font=pygame.font.Font(None, 30),
-                 text_color=(255, 255, 255), top_color='#475F77', bottom_color='#354B5E', over_color='#354B5E',
-                 rounded=True):
+                 text_color=(255, 255, 255), top_color='#475F77', bottom_color='#354B5E', over_color='#354B5E'):
         # Core attributes
         self.pressed = False
         self.click = False
@@ -157,7 +161,8 @@ class Button:
         self.border_radius = border_radius
 
         # Top rectangle
-        self.top_rect = pygame.Rect((pos), (width, height))
+        position = (pos[0] - width // 2, pos[1] - height // 2)
+        self.top_rect = pygame.Rect(position, (width, height))
         self.top_color = top_color
         self.over_color = over_color
         self.saved_color = self.top_color
@@ -192,7 +197,7 @@ class Button:
                 self.dynamic_elevation = 0
             else:
                 self.dynamic_elevation = self.elevation
-                if self.pressed == True:  # We consider the button pressed only if the mouse button was pressed and then released
+                if self.pressed:  # We consider the button pressed only if the mouse button was pressed and then released
                     self.click = True
                     self.pressed = False
         else:
@@ -221,7 +226,8 @@ class Player:
         self.card_to_draw_index = -1
         self.won_cards_position = won_cards_position
 
-        # TODO: make it more efficient assigning the points directly or both cards and points (afterwards you'd need to modify the winner calculation as well)
+        # TODO: make it more efficient assigning the points directly or both cards and points
+        #       (afterwards you'd need to modify the winner calculation as well)
         self.won_cards = []
         self.game_points = 0
 
@@ -236,7 +242,7 @@ class Player:
         # At the last hand we have to draw the "briscola" card and notify that the deck is finished
         else:
             drawn_card = briscola
-            pygame.event.post(Player.deck_finished_event)   # Notify the end of the game
+            pygame.event.post(Player.deck_finished_event)  # Notify the end of the game
 
         print("Len deck: ", len(deck))
         drawn_card.set_target_position(self.hand_positions[self.card_to_draw_index])
@@ -283,18 +289,45 @@ class DummyDeck:
         screen.blit(self.image, self.rect)
 
 
-class GameManager:
-    def __init__(self, players, first_hand_player):
-        self.players = players
+@Pyro5.server.expose
+class Game:
+    player1: Player
+    player2: Player
 
-        self.player_turn = first_hand_player
+    def __init__(self, first_hand_player, server_dealer):
+        # Players and manager creation
+        self.player1 = Player(
+            hand_positions=[[screen_w // 2 + 110, screen_h - 200], [screen_w // 2 - 10, screen_h - 200],
+                            [screen_w // 2 - 130, screen_h - 200]],
+            won_cards_position=[500, screen_h - 200])
+        self.player2 = Player(hand_positions=[[screen_w // 2 + 110, 200], [screen_w // 2 - 10, 200],
+                                              [screen_w // 2 - 130, 200]], won_cards_position=[500, 200])
+        self.players = [self.player1, self.player2]  # Player1 corresponds to the user that is running the client
+        self.first_hand_player = first_hand_player
+
+        # Briscola, deck and dummy deck creation
+        self.server_dealer = server_dealer
+        if first_hand_player:
+            self.server_dealer.create_deck()
+            briscola_symbol = self.server_dealer.set_briscola()
+        else:
+            briscola_symbol = self.server_dealer.get_briscola()
+        self.briscola = Card(briscola_symbol, [screen_w - 200, screen_h // 2])
+        list_deck = self.server_dealer.get_deck()
+        self.deck = self.transform_deck(list_deck)
+        self.dummy_decks = [DummyDeck()]
+
+        if first_hand_player:
+            self.player_turn = 1
+        else:
+            self.player_turn = 2
         self.current_play_num = 0
         self.num_of_players = 2
         self.played_cards = {}
-
         self.game_winner = None
 
-    def transform_deck(self, deck):
+    @staticmethod
+    def transform_deck(deck):
         """
         Transforms the server generated deck in a dictionary populated with Card objects
         :param deck: list of cards'symbols that represent a deck
@@ -304,8 +337,25 @@ class GameManager:
         for card_symbol in deck:
             card_suit = card_symbol[-1]
             card_number = card_symbol[:-1]
-            transformed_deck[card_symbol] = Card(card_number + card_suit)
+            transformed_deck[card_symbol] = Card(card_number + card_suit, [screen_w - 200, screen_h // 2])
         return transformed_deck
+
+    def cards_dealing(self):
+        dealt_cards = self.server_dealer.deal(self.first_hand_player)
+        player = self.player1
+        for index, card_symbol in enumerate(dealt_cards):
+            card = self.deck.pop(card_symbol)
+            print("Card: ", card)
+            card.set_target_position(player.hand_positions[index], dealing=True)
+            print("player.hand_positions[index]: ", player.hand_positions[index])
+            player.cards_in_hand.append(card)
+        print("Cards dealing function, player1.cards_in_hand: ", self.player1.cards_in_hand)
+        print(player.cards_in_hand)
+
+    def get_adversary_cards(self):
+        adversary_cards = self.server_dealer.get_adversary_cards(self.first_hand_player)
+        for index, card_symbol in enumerate(adversary_cards):
+            self.player2.cards_in_hand.append(Card(card_symbol, self.player2.hand_positions[index]))
 
     def print_turn(self, font=pygame.font.Font(None, 30), text_color=(255, 255, 255)):
         if self.player_turn == 1:
@@ -315,6 +365,12 @@ class GameManager:
         text_surf = font.render(text, True, text_color)
         text_rect = text_surf.get_rect()
         text_rect.center = [screen_w // 2 + 310, screen_h - 200]
+        screen.blit(text_surf, text_rect)
+
+    def print_text_on_screen(self, text, pos=[screen_w // 2, screen_h // 2], font=pygame.font.Font(None, 30), text_color=(255, 255, 255)):
+        text_surf = font.render(text, True, text_color)
+        text_rect = text_surf.get_rect()
+        text_rect.center = pos
         screen.blit(text_surf, text_rect)
 
     def register_play(self):
@@ -386,15 +442,15 @@ class GameManager:
         player_points = []
         for i, player in enumerate(self.players):
             player_points.append(0)
-            print("Player ", i+1, " cards: ")
+            print("Player ", i + 1, " cards: ")
             for card in player.won_cards:
                 player_points[i] += card.points
                 print(str(card.number) + card.suit, ", ")
-            print("Player ", i+1, " points: ", player_points[i])
+            print("Player ", i + 1, " points: ", player_points[i])
             player.assign_game_points(player_points[i])
 
         print("Set player points: ", set(player_points), ", len(set(player_points)): ", len(set(player_points)))
-        if len(set(player_points)) == 1:     # Tie
+        if len(set(player_points)) == 1:  # Tie
             return -1
         game_winner = max(range(len(player_points)), key=player_points.__getitem__) + 1
         print("Game winner (get_game_winner): ", game_winner)
@@ -439,35 +495,24 @@ class GameManager:
         screen.blit(text_surf, text_rect)
 
 
-# Players and manager creation
-player1 = Player(hand_positions=[[screen_w // 2 + 110, screen_h - 200], [screen_w // 2 - 10, screen_h - 200],
-                                 [screen_w // 2 - 130, screen_h - 200]], won_cards_position=[500, screen_h - 200])
-player2 = Player(hand_positions=[[screen_w // 2 + 110, 200], [screen_w // 2 - 10, 200],
-                                 [screen_w // 2 - 130, 200]], won_cards_position=[500, 200])
-players = [player1, player2]    # Player1 corresponds to the user that is running the client
-game_manager = GameManager(players, first_hand_player=1)    # TODO: modify this to be the player that created the game on the server
+# Pyro5 server
+server_match_manager_object = Pyro5.client.Proxy("PYRONAME:server.match_manager_object")
+daemon = Pyro5.server.Daemon()
+uri = daemon.register(Game)
+ns = Pyro5.core.locate_ns()
+ns.register("client.game", uri)
 
-# Briscola, deck and dummy deck creation
-server_dealer = Pyro5.client.Proxy("PYRONAME:server.dealer")
-server_dealer.create_deck()
-briscola_symbol = server_dealer.set_briscola()
-briscola = Card(briscola_symbol)
-list_deck = server_dealer.get_deck()
-deck = game_manager.transform_deck(list_deck)
-dummy_decks = [DummyDeck()]
-print("Len deck: ", len(deck))
-print("Deck: ", deck.keys()),
-print("Briscola: ", str(briscola.number) + briscola.suit)
+game = None
+# game = Game(first_hand_player=1)    # TODO: modify this to be the player that created the game on the server
+
+# print("Len deck: ", len(game.deck))
+# print("Deck: ", game.deck.keys()),
+# print("Briscola: ", str(game.briscola.number) + game.briscola.suit)
 
 # Buttons creation
 btn_exit = Button('X', (screen_w - 100, 50), 40, 40, border_radius=30, over_color='#D74B4B')
-# btn_draw = Button('DRAW', (80, 50), 100, 40, border_radius=30)
-
-# # Dealer, players and manager creation and setup
-# briscola = dealer.set_briscola(deck)
-# briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
-# dealer.deal(deck, player1)
-# dealer.deal(deck, player2)
+btn_new_game = Button('NEW GAME', (screen_w // 2, screen_h // 2 - 60), 150, 40, border_radius=30)
+btn_join_game = Button('JOIN GAME', (screen_w // 2, screen_h // 2 + 30), 150, 40, border_radius=30)
 
 # Loop management variables
 running = True
@@ -476,11 +521,12 @@ done_dealing = False
 cards_moving = True
 
 # Game status initialization
-PREPARING = 0
-PLAYING = 1
-GAME_OVER = 2
-game_status = PREPARING
-deck_finished = False    # Needs a different variable because it holds also in the GAME_OVER status
+WAITING = 0
+PREPARING = 1
+PLAYING = 2
+GAME_OVER = 3
+game_status = WAITING
+deck_finished = False  # Needs a different variable because it holds also in the GAME_OVER status
 
 while running:
     for event in pygame.event.get():
@@ -501,7 +547,7 @@ while running:
         if event.type == Player.DECK_FINISHED:
             print("DECK FINISHED!!!")
             deck_finished = True
-            dummy_decks.pop(0)
+            game.dummy_decks.pop(0)
 
     screen.blit(background, (0, 0))
     pygame.draw.circle(screen, (255, 0, 0), screen_center, 4)  # TODO: remove
@@ -512,68 +558,101 @@ while running:
         running = False
         pygame.quit()
         sys.exit()
+    if game_status == WAITING:
+        btn_new_game.draw(screen)
+        if btn_new_game.check_click():
+            server_dealer_uri = server_match_manager_object.new_match(1)
+            server_dealer = Pyro5.client.Proxy(server_dealer_uri)
+            print("Server dealer uri: ", server_dealer)
+            game = Game(first_hand_player=True, server_dealer=server_dealer)
+            screen.blit(background, (0, 0))
+            game.print_text_on_screen("Attendere l'avversario...")
+            pygame.display.update()
+            print("Deck giocatore 1: ", game.deck, "\nLen deck: ", len(game.deck))
+            print("server_match_manager_object giocatore 1: ", server_match_manager_object)
+            game.cards_dealing()
+            game.get_adversary_cards()
+            print("game.player1.cards_in_hand: ", game.player1.cards_in_hand)
+            game_status = PLAYING
+        btn_join_game.draw(screen)
+        if btn_join_game.check_click():
+            print("server_match_manager_object giocatore 2: ", server_match_manager_object)
+            server_dealer_uri = server_match_manager_object.join_match()
+            server_dealer = Pyro5.client.Proxy(server_dealer_uri)
+            game = Game(first_hand_player=False, server_dealer=server_dealer)
+            print("Deck giocatore 2: ", game.deck, "\nLen deck: ", len(game.deck))
+            game.cards_dealing()
+            game.get_adversary_cards()
+            print("game.player1.cards_in_hand: ", game.player1.cards_in_hand)
+            game_status = PLAYING
 
-    # ------------------------------------ Game -------------------------------------- #
-    if game_status == PLAYING:
-        briscola.draw(screen)
+    # If the server creates a Game object, it means that the game is ready and the clients can play
+    if not game is None:
+        game_status = PLAYING
 
-    # Draws dummy decks
-    # TODO: create dummy decks for the "won cards decks"
-    for dummy_deck in dummy_decks:
-        dummy_deck.draw(screen)
+    if not game_status == WAITING:
+        # ------------------------------------ Game -------------------------------------- #
+        if game_status == PLAYING:
+            game.briscola.draw(screen)
 
-    # The cards in the players' hands and the won cards are shown, meanwhile we get a boolean variable for when the dealer is done dealing
-    # and the cards are not moving anymore.
-    if game_status != GAME_OVER:
-        for card in player1.cards_in_hand + player2.cards_in_hand + player1.won_cards + player2.won_cards + list(game_manager.played_cards.values()):
-            card.draw(screen)
-    if game_status == GAME_OVER:
-        # print("STAMPO CARTE VINTE")
-        for card in player1.won_cards + player2.won_cards:
-            # print("Posizione carta vinta (", card, "): ", card.target_position)
-            card.draw(screen)
-            game_manager.print_game_winner(screen_center)
+        # Draws dummy decks
+        # TODO: create dummy decks for the "won cards decks"
+        for dummy_deck in game.dummy_decks:
+            dummy_deck.draw(screen)
 
-    # Checks for mouse clicks only for the cards of the player whose turn is now.
-    # When both players have played the check is performed again only when a new play is ready (
-    # result calculated and cards drawn)
-    # TODO: creare una o più funzioni per la giocata.
-    # print("dealer.player_turn: ", dealer.player_turn)
-    # print("Done dealing: ", done_dealing)
-    if game_status == PLAYING and game_manager.player_turn > 0 and not player1.waiting_for_card() and not player2.waiting_for_card():
-        game_manager.print_turn()
-        played_card = None
-        for i, card in enumerate(players[game_manager.player_turn - 1].cards_in_hand):
-            card_clicked = card.check_click(screen)
-            if card_clicked:
-                played_card = card
-                current_player = players[game_manager.player_turn - 1]
-                # print("Card clicked", played_card.number, played_card.suit)
-                # print("players[dealer.player_turn-1].cards_in_hand", players[dealer.player_turn-1].cards_in_hand)
-                current_player.play(card, card_index=i, plays_num=game_manager.current_play_num)
-                game_manager.register_play()
+        # The cards in the players' hands and the won cards are shown, meanwhile we get a boolean variable for when the dealer is done dealing
+        # and the cards are not moving anymore.
+        if game_status != GAME_OVER:
+            for card in game.player1.cards_in_hand + game.player2.cards_in_hand + game.player1.won_cards + game.player2.won_cards + \
+                        list(game.played_cards.values()):
                 card.draw(screen)
-                if deck_finished:
-                    current_player.pop_card_in_hand(index=i)
+        if game_status == GAME_OVER:
+            # print("STAMPO CARTE VINTE")
+            for card in game.player1.won_cards + game.player2.won_cards:
+                # print("Posizione carta vinta (", card, "): ", card.target_position)
+                card.draw(screen)
+                game.print_game_winner(screen_center)
 
-    if game_manager.current_play_num == 2:
-        if not played_card.is_moving():
-            winner = game_manager.calculate_hand_winner(players, briscola)
-            if not deck_finished:
-                players[winner - 1].draw_card(deck, briscola)  # The winner draws first
-                print("Winner: ", winner, "winner % 2 + 1: ", winner % 2 + 1)
-                players[winner % 2].draw_card(deck, briscola)
-            # print("Player 1 cards in hand: ", [str(x.number)+x.suit for x in player1.cards_in_hand])
-            # print("Player 2 cards in hand: ", [str(x.number)+x.suit for x in player2.cards_in_hand])
-    # -------------------------------------------------------------------------------- #
+        # Checks for mouse clicks only for the cards of the player whose turn is now.
+        # When both players have played the check is performed again only when a new play is ready (
+        # result calculated and cards drawn)
+        # TODO: creare una o più funzioni per la giocata.
+        # print("dealer.player_turn: ", dealer.player_turn)
+        # print("Done dealing: ", done_dealing)
+        if game_status == PLAYING and game.player_turn > 0 and not game.player1.waiting_for_card() and not game.player2.waiting_for_card():
+            game.print_turn()
+            played_card = None
+            for i, card in enumerate(game.players[game.player_turn - 1].cards_in_hand):
+                card_clicked = card.check_click(screen)
+                if card_clicked:
+                    played_card = card
+                    current_player = game.players[game.player_turn - 1]
+                    # print("Card clicked", played_card.number, played_card.suit)
+                    # print("players[dealer.player_turn-1].cards_in_hand", players[dealer.player_turn-1].cards_in_hand)
+                    current_player.play(card, card_index=i, plays_num=game.current_play_num)
+                    game.register_play()
+                    card.draw(screen)
+                    if deck_finished:
+                        current_player.pop_card_in_hand(index=i)
 
-    # The game is over when neither of the players have any card in their hand
-    # print("---\n\nGame status: ", game_status, "\n\n---")
-    if deck_finished and player1.get_cards_in_hand_number() == 0 and player2.get_cards_in_hand_number() == 0 \
-            and game_manager.check_ready_to_assign_the_win() and not game_status == GAME_OVER:
-        game_status = GAME_OVER
-        game_manager.show_won_cards()
-        game_winner = game_manager.calculate_game_winner()
+        if game.current_play_num == 2:
+            if not played_card.is_moving():
+                winner = game.calculate_hand_winner(game.players, game.briscola)
+                if not deck_finished:
+                    game.players[winner - 1].draw_card(game.deck, game.briscola)  # The winner draws first
+                    print("Winner: ", winner, "winner % 2 + 1: ", winner % 2 + 1)
+                    game.players[winner % 2].draw_card(game.deck, game.briscola)
+                # print("Player 1 cards in hand: ", [str(x.number)+x.suit for x in player1.cards_in_hand])
+                # print("Player 2 cards in hand: ", [str(x.number)+x.suit for x in player2.cards_in_hand])
+
+        # The game is over when neither of the players have any card in their hand
+        # print("---\n\nGame status: ", game_status, "\n\n---")
+        if deck_finished and game.player1.get_cards_in_hand_number() == 0 and game.player2.get_cards_in_hand_number() == 0 \
+                and game.check_ready_to_assign_the_win() and not game_status == GAME_OVER:
+            game_status = GAME_OVER
+            game.show_won_cards()
+            game_winner = game.calculate_game_winner()
+        # -------------------------------------------------------------------------------- #
 
     clock.tick(60)
     pygame.display.update()
