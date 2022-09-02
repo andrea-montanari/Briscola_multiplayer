@@ -655,9 +655,14 @@ def graphics_update():
     # The cards in the players' hands and the won cards are shown, meanwhile we get a boolean variable for when the
     # dealer is done dealing and the cards are not moving anymore.
     if game_status != GAME_OVER:
-        for card in game.player1.cards_in_hand + game.player2.cards_in_hand + game.player1.won_cards + game.player2.won_cards + \
-                    list(game.played_cards.values()):
+        for card in game.player1.cards_in_hand + game.player2.cards_in_hand + list(game.played_cards.values()):
             card.draw(screen)
+        for index in range(0, min(len(game.player1.won_cards), 3)):
+            won_card_index = index+1
+            game.player1.won_cards[-won_card_index].draw(screen)
+        for index in range(0, min(len(game.player2.won_cards), 3)):
+            won_card_index = index + 1
+            game.player2.won_cards[-won_card_index].draw(screen)
     if game_status == GAME_OVER:
         for card in game.player1.won_cards + game.player2.won_cards:
             card.draw(screen)
@@ -830,6 +835,9 @@ def main():
                 game_status = GAME_OVER
                 game.show_won_cards()
                 game.calculate_game_winner()
+                game.server_dealer._pyroRelease()
+                server_match._pyroRelease()
+                server_match_manager_object._pyroRelease()
             # -------------------------------------------------------------------------------- #
 
         clock.tick(60)
