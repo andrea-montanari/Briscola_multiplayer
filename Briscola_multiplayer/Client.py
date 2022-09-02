@@ -817,7 +817,8 @@ def main():
                         game.register_play(adversary_played_card)
                         game.adversary_played_card_symbol = None
             if game.game_turn == 0 and len(game.played_cards) == 2:
-                #if not played_card.is_moving():
+                if not adversary_played_card.is_moving() and played_card is None or not played_card.is_moving():
+                    pygame.time.delay(100)
                     print("Calculate hand winner")
                     game.calculate_hand_winner()
                     if not deck_finished:
