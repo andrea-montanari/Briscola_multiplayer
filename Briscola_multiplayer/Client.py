@@ -513,6 +513,7 @@ class Game:
         return game_winner
 
     def show_won_cards(self, space_between=40):
+        print("Show won cards")
         for player in self.players:
             for index, card in enumerate(player.won_cards):
                 # print("Card: (", card, "): ", ", target position: ", card.target_position)
@@ -521,15 +522,20 @@ class Game:
                 new_position = [50 + index * space_between, card.target_position[1]]
                 card.set_target_position(new_position)
 
-    def check_ready_to_assign_the_win(self):
+    def check_ready_to_assign_the_win(self, deck_finished, game_status):
         """
         Checks if the game winner can be calculated, that is when the sum of the cards in the players' deck sum to 40
         (all the cards are in their won cards deck)
         :return: True if the winner can be calculated, False otherwise
         """
+        if not deck_finished:
+            return False
+        if game_status == GAME_OVER:
+            return False
         sum = 0
         for player in self.players:
             sum += len(player.won_cards)
+        print("SUM OF WON CARDS: ", sum)
         if sum == 40:
             return True
         return False
@@ -688,6 +694,8 @@ def main():
     global deck_finished
     global get_adversary_played_card_thread
 
+    delay_server_requests = 0
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -750,6 +758,9 @@ def main():
                 game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
                 game_status = PLAYING
 
+        if game_status == GAME_OVER:
+            graphics_update()
+
         if not game_status == WAITING:
             # ------------------------------------ Game -------------------------------------- #
             if game_status == PLAYING:
@@ -782,11 +793,15 @@ def main():
                                 current_player.pop_card_in_hand(index=i)
                 else:
                     graphics_update()
-                    adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
+                    delay_server_requests += 1
+                    # Make a request every 5 iterations of the loop
+                    adversary_played_card_symbol = None
+                    if delay_server_requests % 5 == 0:
+                        adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
                     if adversary_played_card_symbol is None:
                         graphics_update()
-                        # pygame.time.delay(100)
                     else:
+                        delay_server_requests == 0
                         #if game.adversary_played_card_symbol is None and not game.adversary_played_card_thread_running:
                         #    get_adversary_played_card_thread.start()
                         #else:
@@ -810,17 +825,12 @@ def main():
                         game.player_draw(game.player_turn)
 
             # The game is over when neither of the players have any card in their hand
-            # print("---\n\nGame status: ", game_status, "\n\n---")
-            if deck_finished and game.player1.get_cards_in_hand_number() == 0 and game.player2.get_cards_in_hand_number() == 0 \
-                    and game.check_ready_to_assign_the_win() and not game_status == GAME_OVER:
+            if game.check_ready_to_assign_the_win(deck_finished, game_status):
                 game_status = GAME_OVER
                 game.show_won_cards()
                 game.calculate_game_winner()
             # -------------------------------------------------------------------------------- #
 
-        # Handle pending requests for the Pyro daemon
-        # pyro_config.handle_events()
-        pygame.time.wait(10)
         clock.tick(60)
         pygame.display.update()
 
