@@ -614,6 +614,7 @@ class PyroConfigurator:
     # Pyro5 configuration and NS connection
     def get_server_match_manager_object(self):
         server_match_manager_object = Pyro5.client.Proxy("PYRONAME:server.match_manager_object")
+        server_match_manager_object._pyroBind()
         return server_match_manager_object
 
 #    def register_game_object(self, client_id, game):
@@ -687,10 +688,11 @@ def main():
 
     # Buttons creation
     btn_exit = Button('X', (screen_w - 100, 50), 40, 40, border_radius=30, over_color='#D74B4B')
-    btn_new_game = Button('NEW GAME', (screen_w // 2, screen_h // 2 - 60), 150, 40, border_radius=30)
-    btn_join_game = Button('JOIN GAME', (screen_w // 2, screen_h // 2 + 30), 150, 40, border_radius=30)
+    btn_new_game = Button('NUOVA PARTITA', (screen_w // 2, screen_h // 2 - 60), 300, 40, border_radius=30)
+    btn_join_game = Button('UNISCITI AD UNA PARTITA', (screen_w // 2, screen_h // 2 + 30), 300, 40, border_radius=30)
     btn_ok = Button('OK', (screen_w // 2, screen_h // 2 - 90), 150, 40, border_radius=30)
     btn_home = Button('TORNA ALLA HOME', (screen_w // 2, screen_h // 2 - 90), 250, 40, border_radius=30)
+    btn_cancel = Button('ANNULLA', (screen_w // 2, screen_h // 2 + 90), 150, 40, border_radius=30)
 
     # Loop management variables
     clock = pygame.time.Clock()
@@ -751,23 +753,28 @@ def main():
             if btn_new_game.check_click():
                 screen.blit(background, (0, 0))
                 Game.print_text_on_screen("In attesa dell'avversario...")
-                pygame.display.update()
-                client_id = 1
-                server_dealer_uri, server_match_uri = server_match_manager_object.new_match(client_id)
-                server_dealer = Pyro5.client.Proxy(server_dealer_uri)
-                server_match = Pyro5.client.Proxy(server_match_uri)
-                game = Game(first_hand_player=True, server_dealer=server_dealer)
-                game.cards_dealing()
-                get_adversary_cards_success = game.get_adversary_cards()
-                print("get_adversary_cards_success: ", get_adversary_cards_success)
-                delay_server_dealer_request += 1
-                if get_adversary_cards_success:
-                    delay_server_dealer_request = 0
-    #               pyro_config.register_game_object(client_id, game)
-                    game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
-                    game_status = PLAYING
+                btn_cancel.draw(screen)
+                if btn_cancel.check_click():
+                    server_match_manager_object.remove_created_match(server_match.get_match_id())
                 else:
-                    game_status = WAITING_FOR_SECOND_PLAYER
+                    pygame.display.update()
+                    client_id = 1
+                    server_dealer_uri, server_match_uri = server_match_manager_object.new_match(client_id)
+                    server_dealer = Pyro5.client.Proxy(server_dealer_uri)
+                    server_match = Pyro5.client.Proxy(server_match_uri)
+                    game = Game(first_hand_player=True, server_dealer=server_dealer)
+                    game.cards_dealing()
+                    get_adversary_cards_success = game.get_adversary_cards()
+                    print("get_adversary_cards_success: ", get_adversary_cards_success)
+                    delay_server_dealer_request += 1
+                    if get_adversary_cards_success:
+                        delay_server_dealer_request = 0
+        #               pyro_config.register_game_object(client_id, game)
+                        game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
+                        game_status = PLAYING
+                    else:
+                        game_status = WAITING_FOR_SECOND_PLAYER
+        if game_status == WAITING_FOR_PLAYER_ACTION:
             btn_join_game.draw(screen)
             if btn_join_game.check_click():
                 client_id = 2
@@ -799,6 +806,7 @@ def main():
         if game_status == WAITING_FOR_SECOND_PLAYER:
             Game.print_text_on_screen("In attesa dell'avversario...")
             delay_server_dealer_request += 1
+            btn_cancel.draw(screen)
             # Make a request to the server every 5 loop iterations
             if delay_server_dealer_request % 5 == 0:
                 get_adversary_cards_success = game.get_adversary_cards()
@@ -807,6 +815,9 @@ def main():
                 delay_server_dealer_request = 0
                 game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
                 game_status = PLAYING
+            if btn_cancel.check_click():
+                game_status = WAITING_FOR_PLAYER_ACTION
+                server_match_manager_object.remove_created_match(server_match.get_match_id())
 
         if game_status == JOIN_GAME_FAILED:
             screen.blit(background, (0, 0))
