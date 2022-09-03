@@ -49,11 +49,10 @@ class Dealer:
     def get_adversary_cards(self, first_hand_player):
         if not first_hand_player:
             return self.first_player_cards
-
+        print("Second player cardsss: ", self.second_player_cards)
         # Wait for the second player to call the dealer
-        while len(self.second_player_cards) == 0:
-            # print("Waiting")
-            pass
+        if len(self.second_player_cards) == 0:
+            return None
         return self.second_player_cards
 
     def set_briscola(self):
@@ -150,6 +149,11 @@ class Match:
                 self.first_player_played_card = None
             return first_player_played_card
 
+    @Pyro5.server.expose
+    def get_match_id(self):
+        # We consider the match ID as the id of the client that created it
+        return self.first_player_id
+
 
    # @Pyro5.server.expose
    # def get_adversary_played_card(self, client_id):
@@ -167,7 +171,8 @@ class MatchManager:
 
     def __init__(self):
         # List of the active matches
-        self.matches = []
+        self.created_matches = {}
+        self.active_matches = {}
 
     @Pyro5.server.expose
     def new_match(self, client_id):
@@ -177,11 +182,11 @@ class MatchManager:
         """
         print("new match object: ", self)
         dealer = Dealer()
-        print("Matches new match: ", self.matches)
+        print("Matches new match: ", self.created_matches)
         dealer_uri = daemon.register(dealer)
         match = Match(client_id, dealer, dealer_uri)
         match_uri = daemon.register(match)
-        self.matches.append(match)
+        self.created_matches[client_id] = match
         return dealer_uri, match_uri
         # Pyro5.server.serve(
         #     {
@@ -193,21 +198,40 @@ class MatchManager:
         # )
 
     @Pyro5.server.expose
-    def remove_match(self, client_id):
-        self.matches.remove(client_id)
+    def remove_created_match(self, match_id):
+        print("self.created_matches: ", self.created_matches)
+        print("MATCH: ", self.created_matches[match_id])
+        del self.created_matches[match_id].dealer
+        created_match = self.created_matches.pop(match_id)
+        del created_match
+        print("match deleted, self.created_matches: ", self.created_matches)
+
+    @Pyro5.server.expose
+    def remove_active_match(self, match_id):
+        print("self.active_matches: ", self.active_matches)
+        print("MATCH: ", self.active_matches[match_id])
+        del self.active_matches[match_id].dealer
+        active_match = self.active_matches.pop(match_id)
+        del active_match
+        print("match deleted, self.active_matches: ", self.active_matches)
 
     @Pyro5.server.expose
     def join_match(self, client_id):
-        print("join match object: ", self)
-        print("Matches: ", self.matches)
-        if not len(self.matches) == 0:
-            match = self.matches.pop(0)
+        print("Join match method, created_matches: ", self.created_matches)
+        if not len(self.created_matches) == 0:
+            match = self.created_matches[list(self.created_matches.keys())[0]]
+            print("Match: ", match)
+            self.active_matches[match.first_player_id] = match
             match.set_second_player_id(client_id)
-#            match.set_second_player_register_play_proxy()
-            print("Match: ", match, "\n Dealer: ", match.dealer)
             return match.dealer_uri, daemon.uriFor(match)
         else:
             return None
+
+    @Pyro5.server.expose
+    def is_alive(self, match_id):
+        if self.active_matches.get(match_id, False) == False:
+            return False
+        return True
 
 
 match_manager = MatchManager()
