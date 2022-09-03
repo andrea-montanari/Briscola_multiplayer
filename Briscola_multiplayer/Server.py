@@ -207,8 +207,7 @@ class MatchManager:
             print("Match: ", match, "\n Dealer: ", match.dealer)
             return match.dealer_uri, daemon.uriFor(match)
         else:
-            print("Errore: non ci sono match disponibili")
-            # TODO: far tornare indietro il programma
+            return None
 
 
 match_manager = MatchManager()

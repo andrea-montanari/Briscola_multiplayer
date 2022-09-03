@@ -632,7 +632,7 @@ game = None
 # Game status initialization
 CONNECTING_TO_SERVER = 0
 WAITING = 1
-PREPARING = 2
+JOIN_GAME_FAILED = 2
 PLAYING = 3
 GAME_OVER = 4
 game_status = CONNECTING_TO_SERVER
@@ -686,6 +686,7 @@ def main():
     btn_exit = Button('X', (screen_w - 100, 50), 40, 40, border_radius=30, over_color='#D74B4B')
     btn_new_game = Button('NEW GAME', (screen_w // 2, screen_h // 2 - 60), 150, 40, border_radius=30)
     btn_join_game = Button('JOIN GAME', (screen_w // 2, screen_h // 2 + 30), 150, 40, border_radius=30)
+    btn_ok = Button('OK', (screen_w // 2, screen_h // 2 - 90), 150, 40, border_radius=30)
 
     # Loop management variables
     clock = pygame.time.Clock()
@@ -751,17 +752,30 @@ def main():
             btn_join_game.draw(screen)
             if btn_join_game.check_click():
                 client_id = 2
-                server_dealer_uri, server_match_uri = server_match_manager_object.join_match(client_id)
-                server_dealer = Pyro5.client.Proxy(server_dealer_uri)
-                server_match = Pyro5.client.Proxy(server_match_uri)
-                game = Game(first_hand_player=False, server_dealer=server_dealer)
-                print("Deck giocatore 2: ", game.deck, "\nLen deck: ", len(game.deck))
-                game.cards_dealing()
-                game.get_adversary_cards()
-                print("game.player1.cards_in_hand: ", game.player1.cards_in_hand)
+                try:
+                    server_dealer_uri, server_match_uri = server_match_manager_object.join_match(client_id)
+                    server_dealer = Pyro5.client.Proxy(server_dealer_uri)
+                    server_match = Pyro5.client.Proxy(server_match_uri)
+                    game = Game(first_hand_player=False, server_dealer=server_dealer)
+                    print("Deck giocatore 2: ", game.deck, "\nLen deck: ", len(game.deck))
+                    game.cards_dealing()
+                    game.get_adversary_cards()
+                    print("game.player1.cards_in_hand: ", game.player1.cards_in_hand)
                 # pyro_config.register_game_object(client_id, game)
-                game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
-                game_status = PLAYING
+                    print("Server dealer uti: ", server_dealer_uri)
+                    game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
+                    if not server_dealer_uri is None:
+                        game_status = PLAYING
+                except:
+                    game_status = JOIN_GAME_FAILED
+
+        if game_status == JOIN_GAME_FAILED:
+            screen.blit(background, (0, 0))
+            Game.print_text_on_screen("Non sono presenti partite avviate.", pos=[screen_w // 2, screen_h // 2 - 140])
+            Game.print_text_on_screen("Avviarne una nuova o ritentare più tardi.", pos=[screen_w // 2, screen_h // 2 - 120])
+            btn_ok.draw(screen)
+            if btn_ok.check_click():
+                game_status = WAITING
 
         if game_status == GAME_OVER:
             graphics_update()
@@ -772,66 +786,66 @@ def main():
                 graphics_update()
                 game.briscola.draw(screen)
 
-            # Checks for mouse clicks only for the cards of the player whose turn is now.
-            # When both players have played the check is performed again only when a new play is ready (
-            # result calculated and cards drawn)
-            # TODO: creare una o più funzioni per la giocata.
-            # print("dealer.player_turn: ", dealer.player_turn)
-            # print("Done dealing: ", done_dealing)
-            if game_status == PLAYING and not game.player1.waiting_for_card() and not game.player2.waiting_for_card():
-                game.print_turn()
-                played_card = None
-                print("Player turnn: ", game.player_turn, " - game turn: ", game.game_turn)
-                if game.game_turn == game.player_turn:
-                    for i, card in enumerate(game.player1.cards_in_hand):
-                        card_clicked = card.check_click(screen)
-                        if card_clicked:
-                            played_card = card
-                            current_player = game.player1
-                            print("Played_card: ", played_card)
-                            current_player.play(card, card_index=i, game_turn=game.game_turn, player_turn=game.player_turn)
-                            game.register_play(played_card)
-                            print("Played card number: ", played_card.number)
-                            server_match.register_play(played_card.symbol, client_id)
-                            card.draw(screen)
-                            if deck_finished:
-                                current_player.pop_card_in_hand(index=i)
-                else:
-                    graphics_update()
-                    delay_server_requests += 1
-                    # Make a request every 5 iterations of the loop
-                    adversary_played_card_symbol = None
-                    if delay_server_requests % 5 == 0:
-                        adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
-                    if adversary_played_card_symbol is None:
-                        graphics_update()
+                # Checks for mouse clicks only for the cards of the player whose turn is now.
+                # When both players have played the check is performed again only when a new play is ready (
+                # result calculated and cards drawn)
+                # TODO: creare una o più funzioni per la giocata.
+                # print("dealer.player_turn: ", dealer.player_turn)
+                # print("Done dealing: ", done_dealing)
+                if not game.player1.waiting_for_card() and not game.player2.waiting_for_card():
+                    game.print_turn()
+                    played_card = None
+                    print("Player turnn: ", game.player_turn, " - game turn: ", game.game_turn)
+                    if game.game_turn == game.player_turn:
+                        for i, card in enumerate(game.player1.cards_in_hand):
+                            card_clicked = card.check_click(screen)
+                            if card_clicked:
+                                played_card = card
+                                current_player = game.player1
+                                print("Played_card: ", played_card)
+                                current_player.play(card, card_index=i, game_turn=game.game_turn, player_turn=game.player_turn)
+                                game.register_play(played_card)
+                                print("Played card number: ", played_card.number)
+                                server_match.register_play(played_card.symbol, client_id)
+                                card.draw(screen)
+                                if deck_finished:
+                                    current_player.pop_card_in_hand(index=i)
                     else:
-                        delay_server_requests == 0
-                        #if game.adversary_played_card_symbol is None and not game.adversary_played_card_thread_running:
-                        #    get_adversary_played_card_thread.start()
-                        #else:
-                        adversary_played_card = None
-                        index = None
-                        for i, card in enumerate(game.player2.cards_in_hand):
-                            print("Card symbol: ", adversary_played_card_symbol, " - card in hand: ", card.symbol)
-                            if card.symbol == adversary_played_card_symbol:
-                                print("Nell'if")
-                                adversary_played_card = card
-                                index = i
-                        game.player2.play(adversary_played_card, card_index=index, game_turn=game.game_turn, player_turn=game.player_turn)
-                        game.register_play(adversary_played_card)
-                        game.adversary_played_card_symbol = None
-            if game.game_turn == 0 and len(game.played_cards) == 2:
-                if not adversary_played_card.is_moving() and played_card is None or not played_card.is_moving():
-                    pygame.time.delay(100)
-                    print("Calculate hand winner")
-                    game.calculate_hand_winner()
-                    if not deck_finished:
-                        game.reset_hand_positions()
-                        game.player_draw(game.player_turn)
+                        graphics_update()
+                        delay_server_requests += 1
+                        # Make a request every 5 iterations of the loop
+                        adversary_played_card_symbol = None
+                        if delay_server_requests % 5 == 0:
+                            adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
+                        if adversary_played_card_symbol is None:
+                            graphics_update()
+                        else:
+                            delay_server_requests == 0
+                            #if game.adversary_played_card_symbol is None and not game.adversary_played_card_thread_running:
+                            #    get_adversary_played_card_thread.start()
+                            #else:
+                            adversary_played_card = None
+                            index = None
+                            for i, card in enumerate(game.player2.cards_in_hand):
+                                print("Card symbol: ", adversary_played_card_symbol, " - card in hand: ", card.symbol)
+                                if card.symbol == adversary_played_card_symbol:
+                                    print("Nell'if")
+                                    adversary_played_card = card
+                                    index = i
+                            game.player2.play(adversary_played_card, card_index=index, game_turn=game.game_turn, player_turn=game.player_turn)
+                            game.register_play(adversary_played_card)
+                            game.adversary_played_card_symbol = None
+                if game.game_turn == 0 and len(game.played_cards) == 2:
+                    if not adversary_played_card.is_moving() and played_card is None or not played_card.is_moving():
+                        pygame.time.delay(100)
+                        print("Calculate hand winner")
+                        game.calculate_hand_winner()
+                        if not deck_finished:
+                            game.reset_hand_positions()
+                            game.player_draw(game.player_turn)
 
             # The game is over when neither of the players have any card in their hand
-            if game.check_ready_to_assign_the_win(deck_finished, game_status):
+            if not game_status == JOIN_GAME_FAILED and game.check_ready_to_assign_the_win(deck_finished, game_status):
                 game_status = GAME_OVER
                 game.show_won_cards()
                 game.calculate_game_winner()
