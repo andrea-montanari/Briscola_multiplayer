@@ -572,7 +572,6 @@ class Game:
             p1_drawn_card = drawn_cards[1]
             print(f"Loser! Drawn cards: {p1_drawn_card}, {p2_drawn_card}")
 
-        print("DECK: ", self.deck)
         # Pop the drawn cards from the deck
         if p1_drawn_card == self.briscola.symbol:
             p1_drawn_card = self.briscola
@@ -644,6 +643,8 @@ deck_finished = False  # Needs a different variable because it holds also in the
 
 running = True
 
+btn_home_game_over = Button('TORNA ALLA HOME', (screen_w // 2, screen_h // 2 + 90), 250, 40, border_radius=30)
+
 def graphics_update():
     # Global variables
     global game
@@ -671,6 +672,9 @@ def graphics_update():
         for card in game.player1.won_cards + game.player2.won_cards:
             card.draw(screen)
             game.print_game_winner(screen_center)
+            btn_home_game_over.draw(screen)
+            if btn_home_game_over.check_click():
+                game_status = WAITING_FOR_PLAYER_ACTION
 
 def get_adversary_played_card_thread_method(game):
     game.adversary_played_card_thread_running = True
@@ -730,11 +734,13 @@ def main():
         screen.blit(background, (0, 0))
         pygame.draw.circle(screen, (255, 0, 0), screen_center, 4)  # TODO: remove
 
+        # ----------------------------- SERVER CONNECTION --------------------------- #
         if game_status == CONNECTING_TO_SERVER:
             server_match_manager_object = pyro_config.get_server_match_manager_object()
             game_status = WAITING_FOR_PLAYER_ACTION
+        # --------------------------------------------------------------------------- #
 
-        # Button drawing and handling
+        # --------------------- BUTTON DRAWING AND HANDLING ------------------------- #
         btn_exit.draw(screen)
         if btn_exit.check_click():
             running = False
@@ -769,7 +775,6 @@ def main():
                     delay_server_dealer_request += 1
                     if get_adversary_cards_success:
                         delay_server_dealer_request = 0
-        #               pyro_config.register_game_object(client_id, game)
                         game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
                         game_status = PLAYING
                     else:
@@ -802,6 +807,7 @@ def main():
             btn_home.draw(screen)
             if btn_home.check_click():
                 game_status = WAITING_FOR_PLAYER_ACTION
+        # ------------------------------------------------------------------------ #
 
         if game_status == WAITING_FOR_SECOND_PLAYER:
             Game.print_text_on_screen("In attesa dell'avversario...")
@@ -872,7 +878,8 @@ def main():
                         if delay_server_match_requests % 5 == 0:
                             adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
                         if adversary_played_card_symbol is None:
-                            graphics_update()
+                            pass
+                            #graphics_update()
                         else:
                             delay_server_match_requests == 0
                             #if game.adversary_played_card_symbol is None and not game.adversary_played_card_thread_running:
