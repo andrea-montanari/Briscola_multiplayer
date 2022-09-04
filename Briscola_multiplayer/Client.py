@@ -764,8 +764,7 @@ def main():
                     server_match_manager_object.remove_created_match(server_match.get_match_id())
                 else:
                     pygame.display.update()
-                    client_id = 1
-                    server_dealer_uri, server_match_uri = server_match_manager_object.new_match(client_id)
+                    client_id, server_dealer_uri, server_match_uri = server_match_manager_object.new_match()
                     server_dealer = Pyro5.client.Proxy(server_dealer_uri)
                     server_match = Pyro5.client.Proxy(server_match_uri)
                     game = Game(first_hand_player=True, server_dealer=server_dealer)
@@ -782,12 +781,12 @@ def main():
         if game_status == WAITING_FOR_PLAYER_ACTION:
             btn_join_game.draw(screen)
             if btn_join_game.check_click():
-                client_id = 2
                 screen.blit(background, (0, 0))
                 Game.print_text_on_screen("Ricerca giocatori in corso...")
                 pygame.display.update()
                 try:
-                    server_dealer_uri, server_match_uri = server_match_manager_object.join_match(client_id)
+                    print("Join match premuto")
+                    client_id, server_dealer_uri, server_match_uri = server_match_manager_object.join_match()
                     server_dealer = Pyro5.client.Proxy(server_dealer_uri)
                     server_match = Pyro5.client.Proxy(server_match_uri)
                     game = Game(first_hand_player=False, server_dealer=server_dealer)

@@ -3,12 +3,12 @@ import Pyro5.core
 import Pyro5.client
 import random
 import threading
+import uuid
 
 daemon = Pyro5.server.Daemon()  # make a Pyro daemon
 ns = Pyro5.core.locate_ns()
 
 
-@Pyro5.server.expose
 class Dealer:
     card_suits = ['B', 'C', 'D', 'S']
 
@@ -20,6 +20,7 @@ class Dealer:
 
         self.drawn_cards = []
 
+    @Pyro5.server.expose
     def create_deck(self):
         # Cards creation
         suits_index = 0
@@ -28,9 +29,11 @@ class Dealer:
             if (i + 1) % 10 == 0:
                 suits_index += 1
 
+    @Pyro5.server.expose
     def get_deck(self):
         return self.deck
 
+    @Pyro5.server.expose
     def deal(self, first_hand_player):
         print("Thread: ", threading.current_thread())
         if first_hand_player:
@@ -46,6 +49,7 @@ class Dealer:
             print("Len second player cards: ", len(self.second_player_cards))
             return self.second_player_cards
 
+    @Pyro5.server.expose
     def get_adversary_cards(self, first_hand_player):
         if not first_hand_player:
             return self.first_player_cards
@@ -55,15 +59,18 @@ class Dealer:
             return None
         return self.second_player_cards
 
+    @Pyro5.server.expose
     def set_briscola(self):
         rand_value = random.randint(0, len(self.deck) - 1)
         rand_card = self.deck.pop(rand_value)
         self.briscola = rand_card
         return rand_card
 
+    @Pyro5.server.expose
     def get_briscola(self):
         return self.briscola
 
+    @Pyro5.server.expose
     def player_draw(self):
         len_deck = len(self.deck)
 
@@ -77,6 +84,7 @@ class Dealer:
         print("Self.drawn_cards: ", self.drawn_cards)
         return drawn_card
 
+    @Pyro5.server.expose
     def get_drawn_cards(self):
         while len(self.drawn_cards) != 2:
             #print("Waiting for the drawn cards")
@@ -141,8 +149,6 @@ class Match:
                 self.second_player_played_card = None
             return second_player_played_card
         elif client_id == self.second_player_id:
-           # while self.first_player_played_card is None:
-           #     pass
             with self.p1_played_card_lock:
                 first_player_played_card = self.first_player_played_card
                 print("First player played card: ", self.first_player_played_card)
@@ -175,27 +181,20 @@ class MatchManager:
         self.active_matches = {}
 
     @Pyro5.server.expose
-    def new_match(self, client_id):
+    def new_match(self):
         """
         Creates a new Match object to which it passes a newly created Dealer object.
         :param client_id: id of the player (client) creating the new match
         """
-        print("new match object: ", self)
         dealer = Dealer()
-        print("Matches new match: ", self.created_matches)
         dealer_uri = daemon.register(dealer)
+        client_id = str(uuid.uuid4())
         match = Match(client_id, dealer, dealer_uri)
+        print("new match object: ", match)
         match_uri = daemon.register(match)
         self.created_matches[client_id] = match
-        return dealer_uri, match_uri
-        # Pyro5.server.serve(
-        #     {
-        #         dealer: "server.dealer.1",
-        #     },
-        #     daemon=daemon,
-        #     use_ns=True,
-        #     verbose=True,
-        # )
+        print("Matches new match: ", self.created_matches)
+        return client_id, dealer_uri, match_uri
 
     @Pyro5.server.expose
     def remove_created_match(self, match_id):
@@ -216,15 +215,18 @@ class MatchManager:
         print("match deleted, self.active_matches: ", self.active_matches)
 
     @Pyro5.server.expose
-    def join_match(self, client_id):
-        print("Join match method, created_matches: ", self.created_matches)
+    def join_match(self):
+        print("Join match method, created_matches: ", self.created_matches, ", len(self.created_matches): ", len(self.created_matches))
         if not len(self.created_matches) == 0:
-            match = self.created_matches[list(self.created_matches.keys())[0]]
+            match = self.created_matches.pop(list(self.created_matches.keys())[0])
+            print("Created matches: ", self.created_matches)
             print("Match: ", match)
             self.active_matches[match.first_player_id] = match
+            client_id = str(uuid.uuid4())
             match.set_second_player_id(client_id)
-            return match.dealer_uri, daemon.uriFor(match)
+            return client_id, match.dealer_uri, daemon.uriFor(match)
         else:
+            print("ELSE")
             return None
 
     @Pyro5.server.expose
