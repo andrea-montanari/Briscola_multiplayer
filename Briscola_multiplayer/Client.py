@@ -78,19 +78,19 @@ class Card:
 
     def move_card(self):
         card_moved = False
-        if self.position[0] > self.target_position[0] + self.vel:
+        if self.position[0] > self.target_position[0] + 1:
             self.position[0] -= self.vel
             card_moved = True
             self.moving = True
-        elif self.position[0] < self.target_position[0] - self.vel:
+        elif self.position[0] < self.target_position[0] - 1:
             self.position[0] += self.vel
             card_moved = True
             self.moving = True
-        if self.position[1] < self.target_position[1] - self.vel:
+        if self.position[1] < self.target_position[1] - 1:
             self.position[1] += self.vel
             card_moved = True
             self.moving = True
-        elif self.position[1] > self.target_position[1] + self.vel:
+        elif self.position[1] > self.target_position[1] + 1:
             self.position[1] -= self.vel
             card_moved = True
             self.moving = True

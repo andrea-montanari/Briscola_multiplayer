@@ -1,11 +1,12 @@
 import Pyro5.server
 import Pyro5.core
 import Pyro5.client
+import socket
 import random
 import threading
 import uuid
 
-daemon = Pyro5.server.Daemon()  # make a Pyro daemon
+daemon = Pyro5.server.Daemon(host=socket.gethostbyname('localhost'))  # make a Pyro daemon
 ns = Pyro5.core.locate_ns()
 
 
