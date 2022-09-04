@@ -639,7 +639,11 @@ PLAYING = 4
 GAME_OVER = 5
 ADVERSARY_DISCONNECTED = 6
 game_status = CONNECTING_TO_SERVER
-deck_finished = False  # Needs a different variable because it holds also in the GAME_OVER status
+deck_finished = False  # Needs a different variable because it holds also in the GAME_OVER
+
+# Busy waiting delay factor: delay factor for when we "busy wait" on the server.
+# Every increment increases the delay by 20ms between server calls.
+DELAY_FACTOR = 5
 
 running = True
 
@@ -813,7 +817,7 @@ def main():
             delay_server_dealer_request += 1
             btn_cancel.draw(screen)
             # Make a request to the server every 5 loop iterations
-            if delay_server_dealer_request % 5 == 0:
+            if delay_server_dealer_request % DELAY_FACTOR == 0:
                 get_adversary_cards_success = game.get_adversary_cards()
                 print("get_adversary_cards_success nell'if: ", get_adversary_cards_success)
             if get_adversary_cards_success:
@@ -874,7 +878,7 @@ def main():
                         delay_server_match_requests += 1
                         # Make a request every 5 iterations of the loop
                         adversary_played_card_symbol = None
-                        if delay_server_match_requests % 5 == 0:
+                        if delay_server_match_requests % DELAY_FACTOR == 0:
                             adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
                         if adversary_played_card_symbol is None:
                             pass
