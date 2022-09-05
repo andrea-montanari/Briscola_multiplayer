@@ -1,12 +1,14 @@
 import Pyro5.server
 import Pyro5.core
 import Pyro5.client
-import socket
 import random
 import threading
 import uuid
 
-daemon = Pyro5.server.Daemon(host=socket.gethostbyname('localhost'))  # make a Pyro daemon
+nameserver_ip_file = open("nameserver_ip_address.txt", "r")
+f = open("nameserver_port.txt", "r")
+
+daemon = Pyro5.server.Daemon(host=nameserver_ip_file.read())  # make a Pyro daemon
 ns = Pyro5.core.locate_ns()
 
 

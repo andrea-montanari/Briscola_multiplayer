@@ -599,12 +599,17 @@ class Game:
 
 
 class PyroConfigurator:
+    nameserver_ip_file = open("nameserver_ip_address.txt", "r")
+    nameserver_port_file = open("nameserver_port.txt", "r")
 
     def __init__(self):
         Game.print_text_on_screen("Connessione al server...")
         pygame.display.update()
         self.daemon = Pyro5.server.Daemon()
-        self.ns = Pyro5.core.locate_ns()
+        self.ns = Pyro5.core.locate_ns(
+            PyroConfigurator.nameserver_ip_file.read(),
+            int(PyroConfigurator.nameserver_port_file.read())
+        )
 
     #def handle_events(self):
     #    daemon_sockets = set(self.daemon.sockets)
@@ -612,8 +617,8 @@ class PyroConfigurator:
 
     # Pyro5 configuration and NS connection
     def get_server_match_manager_object(self):
-        server_match_manager_object = Pyro5.client.Proxy("PYRONAME:server.match_manager_object")
-        server_match_manager_object._pyroBind()
+        server_match_manager_object_uri = self.ns.lookup("server.match_manager_object")
+        server_match_manager_object = Pyro5.client.Proxy(server_match_manager_object_uri)
         return server_match_manager_object
 
 #    def register_game_object(self, client_id, game):
@@ -791,6 +796,7 @@ def main():
                 try:
                     print("Join match premuto")
                     client_id, server_dealer_uri, server_match_uri = server_match_manager_object.join_match()
+                    print(f"client_id: {client_id}, server_dealer_uri: {server_dealer_uri}, server_match_uri: {server_match_uri}")
                     server_dealer = Pyro5.client.Proxy(server_dealer_uri)
                     server_match = Pyro5.client.Proxy(server_match_uri)
                     game = Game(first_hand_player=False, server_dealer=server_dealer)
