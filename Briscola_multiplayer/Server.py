@@ -1,6 +1,5 @@
 import Pyro5.server
 import Pyro5.core
-import Pyro5.client
 import random
 import threading
 import uuid

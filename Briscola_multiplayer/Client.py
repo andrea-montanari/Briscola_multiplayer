@@ -18,11 +18,8 @@ size = (0, 0)
 # Sets window to maximum dimension without loosing the taskbar
 screen = pygame.display.set_mode(size, pygame.RESIZABLE)
 pygame.display.set_caption("Bouncing Ball")
-# if sys.platform == "win32":
-#     HWND = pygame.display.get_wm_info()['window']
-#     SW_MAXIMIZE = 3
-#     ctypes.windll.user32.ShowWindow(HWND, SW_MAXIMIZE)
 
+# Gets window dimensions and sets the background
 screen_w, screen_h = screen.get_size()
 screen_center = (screen_w // 2, screen_h // 2)
 background = pygame.image.load("table6.png").convert()
@@ -36,11 +33,7 @@ class Card:
     # Creating events that notify when the the dealer is done dealing and when the cards are moving/stopped
     # Note: adjust the event indexes if needed
     DONE_DEALING = pygame.USEREVENT + 1
-    CARDS_MOVING = pygame.USEREVENT + 2
-    CARDS_STOPPED = pygame.USEREVENT + 3
     done_dealing_event = pygame.event.Event(DONE_DEALING)
-    cards_moving_event = pygame.event.Event(CARDS_MOVING)
-    cards_stopped_event = pygame.event.Event(CARDS_STOPPED)
 
     def __init__(self, card_symbol, position, vel=10):
         self.position = position
@@ -95,15 +88,7 @@ class Card:
             card_moved = True
             self.moving = True
 
-        # print("card's target position: ", self.target_position[0], ", ", self.target_position[1])
-        # print("Card's position: ", self.position[0], ", ", self.position[1])
-
         self.rect.center = self.position
-
-        # if self.moving:
-        #     pygame.event.post(Card.cards_moving_event)
-        # else:
-        #     pygame.event.post(Card.cards_stopped_event)
 
         if not card_moved and self.moving:
             if self.dealing:
@@ -112,14 +97,6 @@ class Card:
             self.moving = False
 
     def is_moving(self):
-        # target_x_r = self.target_position[0] + self.vel
-        # target_x_l = self.target_position[0] - self.vel
-        # target_y_down = self.target_position[0] + self.vel
-        # target_y_up = self.target_position[0] - self.vel
-        # if self.position[0] < target_x_r and self.position[0] > target_x_l \
-        #     and self.position[1] < target_y_up and self.position[1] > target_position_down:
-        #     return False
-        # return True
         return self.moving
 
     def draw(self, screen):
@@ -215,7 +192,7 @@ class Button:
 class Player:
     # Creating an event that notifies the end of the game
     # Note: adjust the event indexes if needed
-    DECK_FINISHED = pygame.USEREVENT + 4
+    DECK_FINISHED = pygame.USEREVENT + 2
     deck_finished_event = pygame.event.Event(DECK_FINISHED)
 
     def __init__(self, hand_positions, won_cards_position):
@@ -261,10 +238,8 @@ class Player:
             card.set_target_position(self.card_played_position_1)
         else:
             card.set_target_position(self.card_played_position_2)
-        # self.cards_in_hand.pop(card_index)
         self.card_to_draw_index = card_index
         print("Card to draw index: ", self.card_to_draw_index)
-        # print("Cards in hand: ", self.cards_in_hand)
 
     def waiting_for_card(self):
         """
@@ -331,7 +306,6 @@ class Game:
 
         self.game_turn = 1          # Current game turn
 
-        #self.current_play_num = 0
         self.num_of_players = 2
         self.played_cards = {}
         self.game_winner = None
@@ -375,7 +349,9 @@ class Game:
             return 0
         for index, card_symbol in enumerate(adversary_cards):
             hand_position = self.player2.hand_positions[index]
-            self.player2.cards_in_hand.append(Card(card_symbol, hand_position))
+            adversary_card = Card(card_symbol, hand_position)
+            adversary_card.turn()
+            self.player2.cards_in_hand.append(adversary_card)
         return 1
 
     def print_turn(self, font=pygame.font.Font(None, 30), text_color=(255, 255, 255)):
@@ -409,38 +385,7 @@ class Game:
             self.game_turn = 2
         elif self.game_turn == 2:
             self.game_turn = 0
-        # TODO: cancellare queste righe se non servono
-        #if self.current_play_num == 1 and self.game_turn == 1:
-        #    self.game_turn = 2
-        #elif self.current_play_num == 1 and self.game_turn == 2:
-        #    self.game_turn = 1
-        #elif self.current_play_num == 2:
-        #    self.game_turn = 0
         print("Play results: ", self.played_cards)
-        #print("Plays num: ", self.current_play_num)
-
-#    @Pyro5.server.expose
-#    def remote_register_play(self, card_symbol):
-#        print("REMOTE REGISTER PLAY START")
-#        print("Game turn: ", self.game_turn)
-#        print("Player turn: ", self.player_turn)
-#        if self.game_turn == self.player_turn:
-#            player = self.player1
-#        else:
-#            player = self.player2
-#        index = None
-#        played_card = None
-#        print("Played card symbol: ", card_symbol)
-#        for i, card in enumerate(player.cards_in_hand):
-#            print("Cards: ", card.symbol)
-#            if card_symbol == card.symbol:
-#                index = i
-#                played_card = card
-#        print("Played_cardddd: ", played_card)
-#        player.play(played_card, index, self.game_turn, self.player_turn)
-#        self.register_play(played_card)
-#        print("REMOTE REGISTER PLAY END")
-#        return 0
 
     def get_adversary_played_card(self):
         if self.player_turn == 1:
@@ -604,34 +549,22 @@ class PyroConfigurator:
 
     def __init__(self):
         Game.print_text_on_screen("Connessione al server...")
-        pygame.display.update()
-        self.daemon = Pyro5.server.Daemon()
         self.ns = Pyro5.core.locate_ns(
             PyroConfigurator.nameserver_ip_file.read(),
             int(PyroConfigurator.nameserver_port_file.read())
         )
 
-    #def handle_events(self):
-    #    daemon_sockets = set(self.daemon.sockets)
-    #    self.daemon.events(daemon_sockets)
-
     # Pyro5 configuration and NS connection
     def get_server_match_manager_object(self):
         server_match_manager_object_uri = self.ns.lookup("server.match_manager_object")
+        print("Nameserver: ", self.ns)
+        print("server_match_manager_object_uri: ", server_match_manager_object_uri)
         server_match_manager_object = Pyro5.client.Proxy(server_match_manager_object_uri)
+        print("server_match_manager_object: ", server_match_manager_object)
         return server_match_manager_object
-
-#    def register_game_object(self, client_id, game):
-#        uri = self.daemon.register(game.remote_register_play)
-#        self.ns.register("client.game." + str(client_id), uri)
 
 
 pyro_config = PyroConfigurator()
-
-
-def thread_pyro_handler():
-    pyro_config.daemon.requestLoop()
-
 
 game = None
 
@@ -685,15 +618,6 @@ def graphics_update():
             if btn_home_game_over.check_click():
                 game_status = WAITING_FOR_PLAYER_ACTION
 
-def get_adversary_played_card_thread_method(game):
-    game.adversary_played_card_thread_running = True
-    adversary_played_card_symbol = game.get_adversary_played_card()
-    while adversary_played_card_symbol is None:
-        adversary_played_card_symbol = game.get_adversary_played_card()
-    game.adversary_played_card_symbol = adversary_played_card_symbol
-    game.adversary_played_card_thread_running = False
-
-get_adversary_played_card_thread = threading.Thread(target=get_adversary_played_card_thread_method)
 
 def main():
 
@@ -709,15 +633,12 @@ def main():
 
     # Loop management variables
     clock = pygame.time.Clock()
-    done_dealing = False
-    cards_moving = True
 
     # Global variables
     global game
     global running
     global game_status
     global deck_finished
-    global get_adversary_played_card_thread
 
     delay_server_match_requests = 0
     delay_server_dealer_request = 0
@@ -730,11 +651,7 @@ def main():
                 sys.exit()
             if event.type == Card.DONE_DEALING:
                 game_status = PLAYING
-            if event.type == Card.CARDS_MOVING:
-                cards_moving = True
-            if event.type == Card.CARDS_STOPPED:
-                cards_moving = False
-            # Delete the dummy deck whe the game is over
+            # Deletes the dummy deck when the game is over
             if event.type == Player.DECK_FINISHED:
                 print("DECK FINISHED!!!")
                 deck_finished = True
@@ -804,7 +721,6 @@ def main():
                     game.cards_dealing()
                     game.get_adversary_cards()
                     print("game.player1.cards_in_hand: ", game.player1.cards_in_hand)
-                # pyro_config.register_game_object(client_id, game)
                     print("Server dealer uti: ", server_dealer_uri)
                     game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
                     if not server_dealer_uri is None:
@@ -880,33 +796,32 @@ def main():
                                 if deck_finished:
                                     current_player.pop_card_in_hand(index=i)
                     else:
-                        graphics_update()
+                        adversary_played_card_symbol = None
                         delay_server_match_requests += 1
                         # Make a request every 5 iterations of the loop
-                        adversary_played_card_symbol = None
                         if delay_server_match_requests % DELAY_FACTOR == 0:
                             adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
                         if adversary_played_card_symbol is None:
                             pass
-                            #graphics_update()
                         else:
                             delay_server_match_requests == 0
-                            #if game.adversary_played_card_symbol is None and not game.adversary_played_card_thread_running:
-                            #    get_adversary_played_card_thread.start()
-                            #else:
-                            adversary_played_card = None
                             index = None
                             for i, card in enumerate(game.player2.cards_in_hand):
                                 print("Card symbol: ", adversary_played_card_symbol, " - card in hand: ", card.symbol)
                                 if card.symbol == adversary_played_card_symbol:
                                     print("Nell'if")
                                     adversary_played_card = card
+                                    adversary_played_card.turn()
                                     index = i
                             game.player2.play(adversary_played_card, card_index=index, game_turn=game.game_turn, player_turn=game.player_turn)
                             game.register_play(adversary_played_card)
                             game.adversary_played_card_symbol = None
+                            # Update shown cards
+                            for card in game.player1.cards_in_hand + game.player2.cards_in_hand + list(
+                                    game.played_cards.values()):
+                                card.draw(screen)
                 if game.game_turn == 0 and len(game.played_cards) == 2:
-                    if not adversary_played_card.is_moving() and played_card is None or not played_card.is_moving():
+                    if not adversary_played_card.is_moving() and (played_card is None or not played_card.is_moving()):
                         pygame.time.delay(100)
                         print("Calculate hand winner")
                         game.calculate_hand_winner()
@@ -929,7 +844,5 @@ def main():
 
 
 if __name__ == "__main__":
-    pyro_handler_thread = threading.Thread(target=thread_pyro_handler)
     main_thread = threading.Thread(target=main())
-    pyro_handler_thread.start()
     main_thread.start()
