@@ -2,5 +2,5 @@ Napoletane
 Piacentine_cards_images
 **/*.lock
 **/.idea
-**/nameserver_ip_address.txt
-**/nameserver_port.txt
+**/__pycache__
+**/remote_connection_config.py

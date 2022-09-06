@@ -1,12 +1,11 @@
 import random
 import sys
-import time
-
 import Pyro5.client
 import Pyro5.server
 import pygame
-
 import threading
+
+import remote_connection_config as conn_cfg
 
 sys.excepthook = Pyro5.errors.excepthook
 
@@ -555,8 +554,8 @@ class PyroConfigurator:
     def __init__(self):
         Game.print_text_on_screen("Connessione al server...")
         self.ns = Pyro5.core.locate_ns(
-            PyroConfigurator.nameserver_ip_file.read(),
-            int(PyroConfigurator.nameserver_port_file.read())
+            conn_cfg.server_address['ip'],
+            conn_cfg.server_address['port']
         )
 
     # Pyro5 configuration and NS connection

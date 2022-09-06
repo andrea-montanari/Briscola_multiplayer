@@ -4,10 +4,9 @@ import random
 import threading
 import uuid
 
-nameserver_ip_file = open("nameserver_ip_address.txt", "r")
-f = open("nameserver_port.txt", "r")
+import remote_connection_config as conn_cfg
 
-daemon = Pyro5.server.Daemon(host=nameserver_ip_file.read())  # make a Pyro daemon
+daemon = Pyro5.server.Daemon(host=conn_cfg.server_address['ip'])  # make a Pyro daemon
 ns = Pyro5.core.locate_ns()
 
 
