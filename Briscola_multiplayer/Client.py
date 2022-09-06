@@ -71,22 +71,26 @@ class Card:
 
     def move_card(self):
         card_moved = False
-        if self.position[0] > self.target_position[0] + 1:
+        if self.position[0] > self.target_position[0] + self.vel:
             self.position[0] -= self.vel
             card_moved = True
             self.moving = True
-        elif self.position[0] < self.target_position[0] - 1:
+        elif self.position[0] < self.target_position[0] - self.vel:
             self.position[0] += self.vel
             card_moved = True
             self.moving = True
-        if self.position[1] < self.target_position[1] - 1:
+        else:
+            self.position[0] = self.target_position[0]
+        if self.position[1] < self.target_position[1] - self.vel:
             self.position[1] += self.vel
             card_moved = True
             self.moving = True
-        elif self.position[1] > self.target_position[1] + 1:
+        elif self.position[1] > self.target_position[1] + self.vel:
             self.position[1] -= self.vel
             card_moved = True
             self.moving = True
+        else:
+            self.position[1] = self.target_position[1]
 
         self.rect.center = self.position
 
@@ -457,7 +461,7 @@ class Game:
         self.game_winner = game_winner
         return game_winner
 
-    def show_won_cards(self, space_between=40):
+    def show_won_cards(self, space_between=42):
         print("Show won cards")
         for player in self.players:
             for index, card in enumerate(player.won_cards):
@@ -526,6 +530,7 @@ class Game:
             p2_drawn_card = self.briscola
         else:
             p2_drawn_card = self.deck.pop(p2_drawn_card)
+        p2_drawn_card.turn()
 
         # Check if one of the drawn cards is briscola
         if self.briscola.symbol == p1_drawn_card.symbol:
@@ -594,11 +599,6 @@ def graphics_update():
     global game_status
     global deck_finished
 
-    # Draws dummy decks
-    # TODO: create dummy decks for the "won cards decks"
-    for dummy_deck in game.dummy_decks:
-        dummy_deck.draw(screen)
-
     # The cards in the players' hands and the won cards are shown, meanwhile we get a boolean variable for when the
     # dealer is done dealing and the cards are not moving anymore.
     if game_status != GAME_OVER:
@@ -617,6 +617,10 @@ def graphics_update():
             btn_home_game_over.draw(screen)
             if btn_home_game_over.check_click():
                 game_status = WAITING_FOR_PLAYER_ACTION
+
+    # Draws dummy decks
+    for dummy_deck in game.dummy_decks:
+        dummy_deck.draw(screen)
 
 
 def main():
@@ -700,7 +704,7 @@ def main():
                     delay_server_dealer_request += 1
                     if get_adversary_cards_success:
                         delay_server_dealer_request = 0
-                        game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
+                        game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
                         game_status = PLAYING
                     else:
                         game_status = WAITING_FOR_SECOND_PLAYER
@@ -722,7 +726,7 @@ def main():
                     game.get_adversary_cards()
                     print("game.player1.cards_in_hand: ", game.player1.cards_in_hand)
                     print("Server dealer uti: ", server_dealer_uri)
-                    game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
+                    game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
                     if not server_dealer_uri is None:
                         game_status = PLAYING
                 except:
@@ -744,7 +748,7 @@ def main():
                 print("get_adversary_cards_success nell'if: ", get_adversary_cards_success)
             if get_adversary_cards_success:
                 delay_server_dealer_request = 0
-                game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 160])
+                game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
                 game_status = PLAYING
             if btn_cancel.check_click():
                 game_status = WAITING_FOR_PLAYER_ACTION
@@ -764,8 +768,8 @@ def main():
         if not game_status == WAITING_FOR_PLAYER_ACTION:
             # ------------------------------------ Game -------------------------------------- #
             if game_status == PLAYING:
-                graphics_update()
                 game.briscola.draw(screen)
+                graphics_update()
 
                 game_alive = server_match_manager_object.is_alive(server_match.get_match_id())
                 if not game_alive:
