@@ -129,8 +129,6 @@ class Card:
             print("Click")
         return self.click
 
-    # TODO: stato della carta (in mazzo, in mano, in quale mano, ...)
-
 
 class Button:
     def __init__(self, text, pos, width, height, elevation=6, border_radius=10, font=pygame.font.Font(None, 30),
@@ -210,8 +208,6 @@ class Player:
         self.card_to_draw_index = None
         self.won_cards_position = won_cards_position
 
-        # TODO: make it more efficient assigning the points directly or both cards and points
-        #       (afterwards you'd need to modify the winner calculation as well)
         self.won_cards = []
         self.game_points = 0
 
@@ -397,8 +393,6 @@ class Game:
             return self.played_cards.get(0)
 
     def calculate_hand_winner(self):
-        # TODO: evaluate moving this method to the game manager class
-
         # Establish winner
         briscola_suit = self.briscola.suit
         p1_suit = self.played_cards.get(0).suit
@@ -548,8 +542,6 @@ class Game:
 
 
 class PyroConfigurator:
-    nameserver_ip_file = open("nameserver_ip_address.txt", "r")
-    nameserver_port_file = open("nameserver_port.txt", "r")
 
     def __init__(self):
         Game.print_text_on_screen("Connessione al server...")
@@ -563,9 +555,14 @@ class PyroConfigurator:
         server_match_manager_object_uri = self.ns.lookup("server.match_manager_object")
         print("Nameserver: ", self.ns)
         print("server_match_manager_object_uri: ", server_match_manager_object_uri)
-        server_match_manager_object = Pyro5.client.Proxy(server_match_manager_object_uri)
-        print("server_match_manager_object: ", server_match_manager_object)
-        return server_match_manager_object
+        with Pyro5.client.Proxy(server_match_manager_object_uri) as server_match_manager_object:
+            try:
+                server_match_manager_object._pyroBind()
+                print("YEP IT IS RUNNING!")
+                return server_match_manager_object
+            except Pyro5.errors.CommunicationError:
+                print("NOPE IT IS NOT REACHABLE!")
+                return 0
 
 
 pyro_config = PyroConfigurator()
@@ -577,14 +574,15 @@ CONNECTING_TO_SERVER = 0
 WAITING_FOR_PLAYER_ACTION = 1
 WAITING_FOR_SECOND_PLAYER = 2
 JOIN_GAME_FAILED = 3
-PLAYING = 4
-GAME_OVER = 5
-ADVERSARY_DISCONNECTED = 6
+NO_SERVER_CONNECTION = 4
+PLAYING = 5
+GAME_OVER = 6
+ADVERSARY_DISCONNECTED = 7
 game_status = CONNECTING_TO_SERVER
 deck_finished = False  # Needs a different variable because it holds also in the GAME_OVER
 
 # Busy waiting delay factor: delay factor for when we "busy wait" on the server.
-# Every increment increases the delay by 20ms between server calls.
+# Every increment increases the delay by circa 20ms between server calls.
 DELAY_FACTOR = 5
 
 running = True
@@ -661,11 +659,11 @@ def main():
                 game.dummy_decks.pop(0)
 
         screen.blit(background, (0, 0))
-        pygame.draw.circle(screen, (255, 0, 0), screen_center, 4)  # TODO: remove
 
         # ----------------------------- SERVER CONNECTION --------------------------- #
         if game_status == CONNECTING_TO_SERVER:
             server_match_manager_object = pyro_config.get_server_match_manager_object()
+            print("server_match_manager_object: ----------- ", server_match_manager_object)
             game_status = WAITING_FOR_PLAYER_ACTION
         # --------------------------------------------------------------------------- #
 
@@ -673,8 +671,8 @@ def main():
         btn_exit.draw(screen)
         if btn_exit.check_click():
             running = False
-            game.server_dealer._pyroRelease()
             try:
+                game.server_dealer._pyroRelease()
                 server_match_manager_object.remove_active_match(server_match.get_match_id())
                 server_match_manager_object.remove_created_match(server_match.get_match_id())
                 server_match._pyroRelease()
@@ -689,30 +687,38 @@ def main():
                 screen.blit(background, (0, 0))
                 Game.print_text_on_screen("In attesa dell'avversario...")
                 btn_cancel.draw(screen)
+                if not server_match_manager_object:
+                    server_match_manager_object = pyro_config.get_server_match_manager_object()
                 if btn_cancel.check_click():
                     server_match_manager_object.remove_created_match(server_match.get_match_id())
                 else:
                     pygame.display.update()
-                    client_id, server_dealer_uri, server_match_uri = server_match_manager_object.new_match()
-                    server_dealer = Pyro5.client.Proxy(server_dealer_uri)
-                    server_match = Pyro5.client.Proxy(server_match_uri)
-                    game = Game(first_hand_player=True, server_dealer=server_dealer)
-                    game.cards_dealing()
-                    get_adversary_cards_success = game.get_adversary_cards()
-                    print("get_adversary_cards_success: ", get_adversary_cards_success)
-                    delay_server_dealer_request += 1
-                    if get_adversary_cards_success:
-                        delay_server_dealer_request = 0
-                        game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
-                        game_status = PLAYING
-                    else:
-                        game_status = WAITING_FOR_SECOND_PLAYER
+                    try:
+                        client_id, server_dealer_uri, server_match_uri = server_match_manager_object.new_match()
+                        server_dealer = Pyro5.client.Proxy(server_dealer_uri)
+                        server_match = Pyro5.client.Proxy(server_match_uri)
+                        game = Game(first_hand_player=True, server_dealer=server_dealer)
+                        game.cards_dealing()
+                        get_adversary_cards_success = game.get_adversary_cards()
+                        print("get_adversary_cards_success: ", get_adversary_cards_success)
+                        delay_server_dealer_request += 1
+                        if get_adversary_cards_success:
+                            delay_server_dealer_request = 0
+                            game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
+                            game_status = PLAYING
+                        else:
+                            game_status = WAITING_FOR_SECOND_PLAYER
+                    except:
+                        game_status = NO_SERVER_CONNECTION
+
         if game_status == WAITING_FOR_PLAYER_ACTION:
             btn_join_game.draw(screen)
             if btn_join_game.check_click():
                 screen.blit(background, (0, 0))
                 Game.print_text_on_screen("Ricerca giocatori in corso...")
                 pygame.display.update()
+                if not server_match_manager_object:
+                    server_match_manager_object = pyro_config.get_server_match_manager_object()
                 try:
                     print("Join match premuto")
                     client_id, server_dealer_uri, server_match_uri = server_match_manager_object.join_match()
@@ -728,6 +734,8 @@ def main():
                     game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
                     if not server_dealer_uri is None:
                         game_status = PLAYING
+                except Pyro5.errors.CommunicationError:
+                    game_status = NO_SERVER_CONNECTION
                 except:
                     game_status = JOIN_GAME_FAILED
         if game_status == ADVERSARY_DISCONNECTED:
@@ -761,6 +769,14 @@ def main():
             if btn_ok.check_click():
                 game_status = WAITING_FOR_PLAYER_ACTION
 
+        if game_status == NO_SERVER_CONNECTION:
+            screen.blit(background, (0, 0))
+            Game.print_text_on_screen("Impossibile contattare il server.", pos=[screen_w // 2, screen_h // 2 - 140])
+            Game.print_text_on_screen("Ritentare più tardi.", pos=[screen_w // 2, screen_h // 2 - 120])
+            btn_ok.draw(screen)
+            if btn_ok.check_click():
+                game_status = CONNECTING_TO_SERVER
+
         if game_status == GAME_OVER:
             graphics_update()
 
@@ -770,16 +786,18 @@ def main():
                 game.briscola.draw(screen)
                 graphics_update()
 
-                game_alive = server_match_manager_object.is_alive(server_match.get_match_id())
-                if not game_alive:
-                    game_status = ADVERSARY_DISCONNECTED
+                # Check if the other player left
+                try:
+                    game_alive = server_match_manager_object.is_alive(server_match.get_match_id())
+                    if not game_alive:
+                        print("Game alive, game_status: ", game_status)
+                        game_status = ADVERSARY_DISCONNECTED
+                except:
+                    game_status = NO_SERVER_CONNECTION
 
                 # Checks for mouse clicks only for the cards of the player whose turn is now.
                 # When both players have played the check is performed again only when a new play is ready (
                 # result calculated and cards drawn)
-                # TODO: creare una o più funzioni per la giocata.
-                # print("dealer.player_turn: ", dealer.player_turn)
-                # print("Done dealing: ", done_dealing)
                 if not game.player1.waiting_for_card() and not game.player2.waiting_for_card():
                     game.print_turn()
                     played_card = None
@@ -801,7 +819,7 @@ def main():
                     else:
                         adversary_played_card_symbol = None
                         delay_server_match_requests += 1
-                        # Make a request every 5 iterations of the loop
+                        # Make a request every "DELAY_FACTOR" iterations of the loop
                         if delay_server_match_requests % DELAY_FACTOR == 0:
                             adversary_played_card_symbol = server_match.get_adversary_played_card(client_id)
                         if adversary_played_card_symbol is None:
@@ -812,7 +830,6 @@ def main():
                             for i, card in enumerate(game.player2.cards_in_hand):
                                 print("Card symbol: ", adversary_played_card_symbol, " - card in hand: ", card.symbol)
                                 if card.symbol == adversary_played_card_symbol:
-                                    print("Nell'if")
                                     adversary_played_card = card
                                     adversary_played_card.turn()
                                     index = i
@@ -833,19 +850,25 @@ def main():
                             game.player_draw(game.player_turn)
 
             # The game is over when neither of the players have any card in their hand
-            if not game_status == JOIN_GAME_FAILED and game.check_ready_to_assign_the_win(deck_finished, game_status):
+            if not game_status == JOIN_GAME_FAILED\
+                    and not game_status == NO_SERVER_CONNECTION \
+                    and not game_status == CONNECTING_TO_SERVER \
+                    and game.check_ready_to_assign_the_win(deck_finished, game_status):
                 game_status = GAME_OVER
                 game.show_won_cards()
                 game.calculate_game_winner()
+                print("Releasing resources...")
                 game.server_dealer._pyroRelease()
                 server_match._pyroRelease()
                 server_match_manager_object._pyroRelease()
+                print("After releasing, game_status = ", game_status)
             # -------------------------------------------------------------------------------- #
 
-        clock.tick(50)
+        clock.tick(60)
         pygame.display.update()
 
 
 if __name__ == "__main__":
+    # TODO: direi che si possa eliminare il threading
     main_thread = threading.Thread(target=main())
     main_thread.start()
