@@ -734,10 +734,15 @@ def main():
                     game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
                     if not server_dealer_uri is None:
                         game_status = PLAYING
-                except Pyro5.errors.CommunicationError:
+                except Pyro5.errors.CommunicationError as e:
                     game_status = NO_SERVER_CONNECTION
-                except:
+                    print("Exception: ", e)
+                except AttributeError as e:
+                    game_status = NO_SERVER_CONNECTION
+                    print("Exception: ", e)
+                except Exception as e:
                     game_status = JOIN_GAME_FAILED
+                    print("Exception: ", e)
         if game_status == ADVERSARY_DISCONNECTED:
             Game.print_text_on_screen("Avversario disconnesso", pos=[screen_w // 2, screen_h // 2 - 120])
             btn_home.draw(screen)
@@ -864,7 +869,7 @@ def main():
                 print("After releasing, game_status = ", game_status)
             # -------------------------------------------------------------------------------- #
 
-        clock.tick(60)
+        clock.tick(50)
         pygame.display.update()
 
 
