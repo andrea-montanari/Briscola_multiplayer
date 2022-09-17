@@ -40,7 +40,6 @@ class Card:
         self.suit = card_symbol[-1]
         self.symbol = card_symbol
         self.face = pygame.image.load("svg-napoletane/" + card_symbol + ".png")
-        print("Card code nella classe Card: ", card_symbol)
         self.back = pygame.image.load("svg-napoletane/back.png")
         self.rect = self.face.get_rect()
         self.rect.center = position
@@ -126,7 +125,6 @@ class Card:
             self.click = False
             self.pressed = False
         if self.click:
-            print("Click")
         return self.click
 
 
@@ -199,7 +197,6 @@ class Player:
     def __init__(self, hand_positions, won_cards_position):
         self.cards_in_hand = []
         self.hand_positions = hand_positions
-        print("Initial hand positions: ", self.hand_positions)
 
         # Cards played positions
         self.card_played_position_1 = [screen_center[0] - 10, screen_center[1]]
@@ -224,7 +221,6 @@ class Player:
             drawn_card = briscola
             pygame.event.post(Player.deck_finished_event)  # Notify the end of the game
 
-        print("Len deck: ", len(deck))
         hand_position = self.hand_positions[self.card_to_draw_index]
         drawn_card.set_target_position(hand_position)
         self.cards_in_hand[self.card_to_draw_index] = drawn_card
@@ -238,7 +234,6 @@ class Player:
         else:
             card.set_target_position(self.card_played_position_2)
         self.card_to_draw_index = card_index
-        print("Card to draw index: ", self.card_to_draw_index)
 
     def waiting_for_card(self):
         """
@@ -335,12 +330,9 @@ class Game:
         player = self.player1
         for index, card_symbol in enumerate(dealt_cards):
             card = self.deck.pop(card_symbol)
-            print("Card: ", card)
             hand_position = player.hand_positions[index]
             card.set_target_position(hand_position, dealing=True)
             player.cards_in_hand.append(card)
-        print("Cards dealing function, player1.cards_in_hand: ", self.player1.cards_in_hand)
-        print(player.cards_in_hand)
 
     def get_adversary_cards(self):
         adversary_cards = self.server_dealer.get_adversary_cards(self.first_hand_player)
@@ -377,14 +369,12 @@ class Game:
             self.played_cards[0] = played_card
         else:
             self.played_cards[1] = played_card
-        print("Register play - played card: ", played_card.symbol)
 
         # Updates turn and play's number
         if self.game_turn == 1:
             self.game_turn = 2
         elif self.game_turn == 2:
             self.game_turn = 0
-        print("Play results: ", self.played_cards)
 
     def get_adversary_played_card(self):
         if self.player_turn == 1:
@@ -439,27 +429,19 @@ class Game:
         player_points = []
         for i, player in enumerate(self.players):
             player_points.append(0)
-            print("Player ", i + 1, " cards: ")
             for card in player.won_cards:
                 player_points[i] += card.points
-                print(str(card.number) + card.suit, ", ")
-            print("Player ", i + 1, " points: ", player_points[i])
             player.assign_game_points(player_points[i])
 
-        print("Set player points: ", set(player_points), ", len(set(player_points)): ", len(set(player_points)))
         if len(set(player_points)) == 1:  # Tie
             return -1
         game_winner = max(range(len(player_points)), key=player_points.__getitem__) + 1
-        print("Game winner (get_game_winner): ", game_winner)
         self.game_winner = game_winner
         return game_winner
 
     def show_won_cards(self, space_between=42):
-        print("Show won cards")
         for player in self.players:
             for index, card in enumerate(player.won_cards):
-                # print("Card: (", card, "): ", ", target position: ", card.target_position)
-                # pos = [card.position[0] + (index*10), card.position[1]]
                 card.turn()
                 new_position = [50 + index * space_between, card.target_position[1]]
                 card.set_target_position(new_position)
@@ -477,14 +459,12 @@ class Game:
         sum = 0
         for player in self.players:
             sum += len(player.won_cards)
-        print("SUM OF WON CARDS: ", sum)
         if sum == 40:
             return True
         return False
 
     def print_game_winner(self, screen_center, font=pygame.font.Font(None, 50), text_color=(255, 255, 255)):
         text = ""
-        # print("Game winner (print_game_winner): ", game_winner)
         if self.game_winner == 1:
             text += "Hai vinto con " + str(self.players[0].game_points) + " punti!"
         elif self.game_winner == -1:
@@ -504,15 +484,12 @@ class Game:
         if player_turn == 1:
             p1_drawn_card = self.server_dealer.player_draw()
             p2_drawn_card = self.server_dealer.player_draw()
-            print(f"Winner! Drawn cards: {p1_drawn_card}, {p2_drawn_card}")
         # If the winner is not the current player, the cards have already been drawn, then they ask for the previously
         # drawn cards
         else:
             drawn_cards = self.server_dealer.get_drawn_cards()
-            print("Drawn cards: ", drawn_cards)
             p2_drawn_card = drawn_cards[0]
             p1_drawn_card = drawn_cards[1]
-            print(f"Loser! Drawn cards: {p1_drawn_card}, {p2_drawn_card}")
 
         # Pop the drawn cards from the deck
         if p1_drawn_card == self.briscola.symbol:
@@ -553,8 +530,6 @@ class PyroConfigurator:
     # Pyro5 configuration and NS connection
     def get_server_match_manager_object(self):
         server_match_manager_object_uri = self.ns.lookup("server.match_manager_object")
-        print("Nameserver: ", self.ns)
-        print("server_match_manager_object_uri: ", server_match_manager_object_uri)
         with Pyro5.client.Proxy(server_match_manager_object_uri) as server_match_manager_object:
             try:
                 server_match_manager_object._pyroBind()
@@ -663,7 +638,6 @@ def main():
         # ----------------------------- SERVER CONNECTION --------------------------- #
         if game_status == CONNECTING_TO_SERVER:
             server_match_manager_object = pyro_config.get_server_match_manager_object()
-            print("server_match_manager_object: ----------- ", server_match_manager_object)
             game_status = WAITING_FOR_PLAYER_ACTION
         # --------------------------------------------------------------------------- #
 
@@ -700,7 +674,6 @@ def main():
                         game = Game(first_hand_player=True, server_dealer=server_dealer)
                         game.cards_dealing()
                         get_adversary_cards_success = game.get_adversary_cards()
-                        print("get_adversary_cards_success: ", get_adversary_cards_success)
                         delay_server_dealer_request += 1
                         if get_adversary_cards_success:
                             delay_server_dealer_request = 0
@@ -720,17 +693,12 @@ def main():
                 if not server_match_manager_object:
                     server_match_manager_object = pyro_config.get_server_match_manager_object()
                 try:
-                    print("Join match premuto")
                     client_id, server_dealer_uri, server_match_uri = server_match_manager_object.join_match()
-                    print(f"client_id: {client_id}, server_dealer_uri: {server_dealer_uri}, server_match_uri: {server_match_uri}")
                     server_dealer = Pyro5.client.Proxy(server_dealer_uri)
                     server_match = Pyro5.client.Proxy(server_match_uri)
                     game = Game(first_hand_player=False, server_dealer=server_dealer)
-                    print("Deck giocatore 2: ", game.deck, "\nLen deck: ", len(game.deck))
                     game.cards_dealing()
                     game.get_adversary_cards()
-                    print("game.player1.cards_in_hand: ", game.player1.cards_in_hand)
-                    print("Server dealer uti: ", server_dealer_uri)
                     game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
                     if not server_dealer_uri is None:
                         game_status = PLAYING
@@ -757,7 +725,6 @@ def main():
             # Make a request to the server every 5 loop iterations
             if delay_server_dealer_request % DELAY_FACTOR == 0:
                 get_adversary_cards_success = game.get_adversary_cards()
-                print("get_adversary_cards_success nell'if: ", get_adversary_cards_success)
             if get_adversary_cards_success:
                 delay_server_dealer_request = 0
                 game.briscola.set_target_position([screen_w - 200, screen_h // 2 - 140])
@@ -806,17 +773,14 @@ def main():
                 if not game.player1.waiting_for_card() and not game.player2.waiting_for_card():
                     game.print_turn()
                     played_card = None
-                    # print("Player turnn: ", game.player_turn, " - game turn: ", game.game_turn)
                     if game.game_turn == game.player_turn:
                         for i, card in enumerate(game.player1.cards_in_hand):
                             card_clicked = card.check_click(screen)
                             if card_clicked:
                                 played_card = card
                                 current_player = game.player1
-                                print("Played_card: ", played_card)
                                 current_player.play(card, card_index=i, game_turn=game.game_turn, player_turn=game.player_turn)
                                 game.register_play(played_card)
-                                print("Played card number: ", played_card.number)
                                 server_match.register_play(played_card.symbol, client_id)
                                 card.draw(screen)
                                 if deck_finished:
@@ -833,7 +797,6 @@ def main():
                             delay_server_match_requests == 0
                             index = None
                             for i, card in enumerate(game.player2.cards_in_hand):
-                                print("Card symbol: ", adversary_played_card_symbol, " - card in hand: ", card.symbol)
                                 if card.symbol == adversary_played_card_symbol:
                                     adversary_played_card = card
                                     adversary_played_card.turn()
@@ -848,7 +811,6 @@ def main():
                 if game.game_turn == 0 and len(game.played_cards) == 2:
                     if not adversary_played_card.is_moving() and (played_card is None or not played_card.is_moving()):
                         pygame.time.delay(100)
-                        print("Calculate hand winner")
                         game.calculate_hand_winner()
                         if not deck_finished:
                             game.reset_hand_positions()
@@ -862,11 +824,9 @@ def main():
                 game_status = GAME_OVER
                 game.show_won_cards()
                 game.calculate_game_winner()
-                print("Releasing resources...")
                 game.server_dealer._pyroRelease()
                 server_match._pyroRelease()
                 server_match_manager_object._pyroRelease()
-                print("After releasing, game_status = ", game_status)
             # -------------------------------------------------------------------------------- #
 
         clock.tick(50)
