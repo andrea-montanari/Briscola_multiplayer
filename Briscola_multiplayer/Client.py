@@ -125,7 +125,7 @@ class Card:
             self.click = False
             self.pressed = False
         if self.click:
-        return self.click
+            return self.click
 
 
 class Button:
