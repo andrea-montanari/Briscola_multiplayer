@@ -21,7 +21,7 @@ pygame.display.set_caption("Bouncing Ball")
 # Gets window dimensions and sets the background
 screen_w, screen_h = screen.get_size()
 screen_center = (screen_w // 2, screen_h // 2)
-background = pygame.image.load("table6.png").convert()
+background = pygame.image.load("table.png").convert()
 background = pygame.transform.scale(background, (screen_w, screen_h))
 
 
