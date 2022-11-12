@@ -69,4 +69,4 @@ python Client.py
 
 * In the server machine it is sufficient to keep the files "Server.py", "remote_connection_config.py" and "Pipfile", while in the client machines all the files are necessary with exception of "Server.py".
 
-* The system is currently only able to work in local networks.
+* The system is currently only able to work in local networks. 
