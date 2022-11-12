@@ -2,7 +2,7 @@ Napoletane
 Piacentine_cards_images
 **/*.lock
 **/.idea
-**/__pycache__
+__pycache__/
 **/remote_connection_config.py
-Diagrammi_UML
-**/Documentazione
+Diagrammi_UML/
+**/Documentazione/
