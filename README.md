@@ -1,4 +1,4 @@
-# Briscola_multiplayer
+# Briscola Multiplayer
 
 Multiplayer Briscola game realized with Python.
 
