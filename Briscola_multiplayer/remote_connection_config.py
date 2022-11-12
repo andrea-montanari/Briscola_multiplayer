@@ -6,5 +6,5 @@ s.close()
 
 server_address = {
     "ip": ns_ip,
-    "port": 64339
+    "port": 50329
 }

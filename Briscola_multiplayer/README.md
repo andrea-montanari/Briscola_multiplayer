@@ -1,66 +1,72 @@
 # Briscola multiplayer
-Gioco della Briscola multiplayer.
-Supporta due giocatori per partita.
+Multiplayer Briscola game realized with Python.
 
-## Struttura
-Client: gestisce la logica di gioco, l'interfaccia grafica e comunica col server per creare nuove partite, unirsi a partite esistenti e per ottenere le carte giocate dall'avversario e per pescare. Ogni giocatore deve eseguire un'istanza Client.
+Supports two players per match.
 
-Server: gestisce la creazione e l'eliminazione delle partite e la comunicazione tra i giocatori.
+## Structure
+Client: handles the game logic, the graphic interface and communicates with the server to create new matches, join existing matches. The communication with the server is also active during the matches: to get the adversary played cards and to draw. Each player executes a Client's instance.
 
-## Prerequisiti
-* [python 3.8 o superiore](https://www.python.org/downloads/)
+Server: handles the creation and the elimination of the matches and the communication between the players.
+
+## prerequisites
+* [python 3.8 or superior](https://www.python.org/downloads/)
 * pipenv
 <br>
-installazione:
+installation:
   ```
   $ pip3 install pipenv
   ```
 
   
-## Librerie non standard utilizzate
+## Non-standard libraries used
 * Pyro5
 * Pygame
 
-Per installare le librerie posizionarsi nella cartella del progetto ed eseguire da terminale:
+To install the libraries, move to the project's directory and run the following command from terminal:
 ```
 $ pipenv install
 ```
-Nota: l'installazione delle librerie è necessaria sia sulla macchina adibita a server sia sui client.
+Note: the libraries installation is necessary both in the client machine and in the server machine.
 
-## Attivazione nameserver
-Sulla macchina che si vuole adibire a server, aprire un terminale nella cartella del progetto e digitare:
+## Nameserver activation
+A Pyro5 nameserver is used to keep track of the objects in the network more easily.
+You should activate a Pyro5 nameserver in the server machine running the following commands on the terminal: 
 ```
 pipenv shell
 python -m Pyro5.nameserver --host <host_ip> -p <port>
 ```
 
-Sostituire a \<host_ip> l'indirizzo IP della macchina su cui si sta eseguendo e a \<port> una porta libera tramite la quale si darà accesso al nameserver (inserire 0 per far scegliere la porta automaticamente).
+Replace \<host_ip> with the IP address of the current machine and \<port> with a free port through which access to the nameserver will be given (insert 0 to make it choose the port automatically).
 
-## Esecuzione server
-Sulla macchina che si vuole adibire a server, aprire un terminale nella cartella del progetto e digitare:
+## Configuration
+In the project directory insert a file with the name 'remote_connection_config.py' and write a dictionary with the following structure in it (or modify the existing one):
+```
+server_address = {
+    "ip": <ip address of the nameserver>,
+    "port": <port used by the nameserver>
+}
+```
+replacing \<ip address of the nameserver> and \<port used by the nameserver> with IP and port previously assigned to the nameserver.
+
+Note: this configuration is necessary both in the client machines and in the server machines
+
+## Server execution
+In the server machine, open a terminal in the project directory and run:
 ```
 pipenv shell
 python Server.py
 ```
 
-## Configurazione Client
-All'interno della cartella del progetto inserire un file con nome 'remote_connection_config.py' e inserirvi un dizionario Python con la seguente struttura:
-```
-server_address = {
-    "ip": <indirizzo ip del nameserver>,
-    "port": <porta utilizzata dal nameserver>
-}
-```
-sostituendo \<indirizzo ip del nameserver> e \<porta utilizzata dal nameserver> con ip e porta assegnati precedentemente al nameserver.
-
-## Esecuzione Client
-Posizionarsi nella cartella del progetto ed eseguire da terminale:
+## Client execution
+Position in the project directory and run from terminal:
 ```
 pipenv shell
 python Client.py
 ```
 
-## Note
-Sostituire "py" a "python" in tutti i comandi indicati sopra nel caso in cui il comando "python" non dovesse funzionare.
+## Notes
+* Replace "python" with "py" in all the above mentioned command in case the "python" command doesn't work.
 
-Il sistema è attualmente funzionante solamente in reti locali.
+* In the server machine it is sufficient to keep the files "Server.py", "remote_connection_config.py" and "Pipfile", while in the client machines all the files are necessary with exception of "Server.py".
+
+* The system is currently only able to work in local networks.
