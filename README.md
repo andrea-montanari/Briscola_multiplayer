@@ -1,5 +1,5 @@
 # Briscola multiplayer
-Multiplayer Briscola game realized with Python.
+Multiplayer [Briscola](https://en.wikipedia.org/wiki/Briscola) game realized with Python.
 
 Supports two players per match.
 
@@ -13,6 +13,7 @@ Server: handles the creation and the elimination of the matches and the communic
 * pipenv
 <br>
 installation:
+
   ```
   $ pip3 install pipenv
   ```
@@ -65,7 +66,7 @@ python Client.py
 ```
 
 ## Notes
-* Replace "python" with "py" in all the above mentioned command in case the "python" command doesn't work.
+* Replace "python" with "py" in all the above mentioned commands in case the "python" command doesn't work.
 
 * In the server machine it is sufficient to keep the files "Server.py", "remote_connection_config.py" and "Pipfile", while in the client machines all the files are necessary with exception of "Server.py".
 
